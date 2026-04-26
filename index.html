@@ -89,31 +89,30 @@ nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:
 .goal-fill{height:100%;border-radius:3px;transition:width .5s}
 .goal-val{font-family:var(--mono);font-size:10px;color:var(--text2);width:100px;text-align:right}
 
-/* TRADE TABLE */
+/* TRADE TABLE — no horizontal scroll */
 .sec-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
 .sec-title{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.07em}
-.table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:auto;margin-bottom:18px}
-.trade-table{width:100%;border-collapse:collapse;font-size:12px;min-width:980px}
-.trade-table th{font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:var(--muted);padding:9px 11px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap;background:var(--bg2)}
-.trade-table td{padding:8px 11px;border-bottom:1px solid var(--border);white-space:nowrap;vertical-align:middle;color:var(--text2)}
+.table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:18px}
+.trade-table{width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed}
+.trade-table th{font-family:var(--mono);font-size:9px;letter-spacing:.04em;color:var(--muted);padding:8px 5px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap;background:var(--bg2);overflow:hidden;text-overflow:ellipsis}
+.trade-table td{padding:7px 5px;border-bottom:1px solid var(--border);vertical-align:middle;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .trade-table tr:last-child td{border-bottom:none}
 .trade-table tr:hover td{background:var(--surface2)}
-.td-date{font-family:var(--mono);font-size:11px;color:var(--text2)}
-.td-num{font-family:var(--mono);font-size:11px;color:var(--text2)}
-.td-note{font-size:11px;color:var(--text2);max-width:130px;overflow:hidden;text-overflow:ellipsis}
+.td-date{font-family:var(--mono);font-size:10px;color:var(--text2)}
+.td-num{font-family:var(--mono);font-size:10px;color:var(--text2)}
+.td-note{font-size:10px;color:var(--muted)}
 .side-buy{color:var(--green);font-family:var(--mono);font-size:11px;font-weight:600}
 .side-sell{color:var(--red);font-family:var(--mono);font-size:11px;font-weight:600}
-.pnl-pos{color:var(--green);font-family:var(--mono);font-weight:600}
-.pnl-neg{color:var(--red);font-family:var(--mono);font-weight:600}
-.confirm-ok{color:var(--green);font-size:13px}
-.confirm-no{color:var(--red);font-size:13px}
-.emo-cell{font-size:14px}
-.trend-badge{font-family:var(--mono);font-size:10px;padding:2px 6px;border-radius:2px}
+.pnl-pos{color:var(--green);font-family:var(--mono);font-size:11px;font-weight:600}
+.pnl-neg{color:var(--red);font-family:var(--mono);font-size:11px;font-weight:600}
+.confirm-ok{color:var(--green);font-size:12px}.confirm-no{color:var(--red);font-size:12px}
+.emo-cell{font-size:12px}
+.trend-badge{font-family:var(--mono);font-size:9px;padding:1px 4px;border-radius:2px}
 .trend-up{background:var(--green2);color:var(--green)}.trend-down{background:var(--red2);color:var(--red)}.trend-sw{background:var(--blue2);color:var(--blue)}
-.zone-badge{font-family:var(--mono);font-size:10px;padding:2px 6px;border-radius:2px;background:var(--surface2);color:var(--text2);border:1px solid var(--border2)}
-.mistake-badge{font-family:var(--mono);font-size:10px;padding:2px 6px;border-radius:2px;background:rgba(255,179,71,0.12);color:var(--amber);border:1px solid rgba(255,179,71,0.2)}
-.quality-stars{font-size:11px;letter-spacing:-1px}
-.action-btn{font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:3px;border:1px solid var(--border2);background:none;cursor:pointer;transition:all .1s}
+.zone-badge{font-family:var(--mono);font-size:9px;padding:1px 4px;border-radius:2px;background:var(--surface2);color:var(--text2);border:1px solid var(--border2)}
+.mistake-badge{font-family:var(--mono);font-size:9px;padding:1px 4px;border-radius:2px;background:rgba(255,179,71,0.12);color:var(--amber);border:1px solid rgba(255,179,71,0.2);display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.quality-stars{font-size:10px;letter-spacing:-2px}
+.action-btn{font-family:var(--mono);font-size:9px;padding:2px 5px;border-radius:3px;border:1px solid var(--border2);background:none;cursor:pointer;transition:all .1s}
 .edit-btn{color:var(--blue)}.edit-btn:hover{border-color:var(--blue);background:var(--blue2)}
 .del-btn{color:var(--red)}.del-btn:hover{border-color:var(--red);background:var(--red2)}
 
@@ -281,22 +280,31 @@ nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:
 
   <!-- TRADE LOG -->
   <div class="page" id="page-log">
-    <div class="sec-header"><div class="sec-title">TRADE LOG</div></div>
+    <div class="sec-header">
+      <div class="sec-title">TRADE LOG</div>
+      <button class="nav-util" style="color:var(--green);border-color:rgba(0,229,160,0.3)" onclick="pushToSheet(false)">↑ Save to Sheets</button>
+    </div>
     <div class="filter-row" id="filter-row"></div>
     <div class="table-wrap">
       <table class="trade-table">
+        <colgroup>
+          <col style="width:80px"><col style="width:46px"><col style="width:36px"><col style="width:34px">
+          <col style="width:44px"><col style="width:44px"><col style="width:44px"><col style="width:44px">
+          <col style="width:62px"><col style="width:68px"><col style="width:30px"><col style="width:52px">
+          <col style="width:70px"><col style="width:50px"><col style="width:90px">
+          <col style="width:20px"><col style="width:24px"><col style="width:80px"><col style="width:52px">
+        </colgroup>
         <thead><tr>
           <th>DATE</th><th>TIME</th><th>SIDE</th><th>LOT</th>
           <th>ENTRY</th><th>EXIT</th><th>SL</th><th>TP</th>
-          <th>P&L ($)</th><th>BALANCE ($)</th><th>R:R</th><th>QUALITY</th>
-          <th>TREND</th><th>ZONE</th><th>MISTAKE</th><th>✓</th><th>EMO</th><th>NOTES</th>
-          <th>ACTIONS</th>
+          <th>P&L ($)</th><th>BAL ($)</th><th>RR</th><th>★</th>
+          <th>TREND</th><th>ZONE</th><th>MISTAKE</th>
+          <th>✓</th><th>EMO</th><th>NOTES</th><th>ACT</th>
         </tr></thead>
         <tbody id="trade-tbody"></tbody>
       </table>
     </div>
     <div class="pagination" id="pagination"></div>
-  </div>
 
   <!-- ADD TRADE -->
   <div class="page" id="page-add">
@@ -870,7 +878,17 @@ function renderDashboard(){
 
 // ── TRADE LOG ────────────────────────────────────────────────────────
 let currentFilter='ALL', currentPage=1;
-const PER_PAGE=12;
+const PER_PAGE=15;
+
+function cleanTime(v){
+  if(!v || v==='--:--') return '--:--';
+  // Fix 1899-12-30T... ISO time from Sheets
+  if(typeof v==='string' && v.includes('T')){
+    const m = v.match(/T(\d{2}):(\d{2})/);
+    return m ? `${m[1]}:${m[2]}` : '--:--';
+  }
+  return String(v).slice(0,5);
+}
 
 function renderLog(){
   const filters=['ALL','BUY','SELL','WIN','LOSS','NO CONFIRM','★★★★★'];
@@ -895,9 +913,12 @@ function renderLog(){
 
   document.getElementById('trade-tbody').innerHTML=slice.map((t,i)=>{
     const bal=(ac.capital+t.net).toFixed(2);
+    const trend = fixStr(t.trend)||'Sideways';
+    const trendCls = trend==='Uptrend'?'trend-up':trend==='Downtrend'?'trend-down':'trend-sw';
+    const trendShort = trend==='Uptrend'?'Up▲':trend==='Downtrend'?'Down▼':'Side';
     return `<tr>
-      <td class="td-date">${t.date}</td>
-      <td class="td-date">${t.start}</td>
+      <td class="td-date">${fixDate(t.date)}</td>
+      <td class="td-date">${cleanTime(t.start)}</td>
       <td class="${t.side==='BUY'?'side-buy':'side-sell'}">${t.side}</td>
       <td class="td-num">${t.lot}</td>
       <td class="td-num">${t.entry}</td>
@@ -908,15 +929,15 @@ function renderLog(){
       <td class="td-num">$${bal}</td>
       <td class="td-num">${t.rr}</td>
       <td class="quality-stars" style="color:${t.quality>=4?'#ffb347':'#3a4060'}">${stars(t.quality)}</td>
-      <td><span class="trend-badge ${tC(t.trend)}">${t.trend}</span></td>
-      <td><span class="zone-badge">${t.zone}</span></td>
-      <td>${t.mistake?`<span class="mistake-badge">${t.mistake}</span>`:''}</td>
-      <td class="${t.confirm==='✅'?'confirm-ok':'confirm-no'}">${t.confirm}</td>
-      <td class="emo-cell">${t.emo}</td>
-      <td class="td-note" title="${t.notes}">${t.notes||'—'}</td>
-      <td style="white-space:nowrap">
+      <td><span class="trend-badge ${trendCls}">${trendShort}</span></td>
+      <td><span class="zone-badge">${t.zone||''}</span></td>
+      <td>${t.mistake?`<span class="mistake-badge" title="${t.mistake}">${t.mistake}</span>`:''}</td>
+      <td class="${t.confirm==='✅'?'confirm-ok':'confirm-no'}">${t.confirm||''}</td>
+      <td class="emo-cell">${t.emo||''}</td>
+      <td class="td-note" title="${t.notes||''}">${t.notes||'—'}</td>
+      <td>
         <button class="action-btn edit-btn" onclick="editTrade('${t.id}')">✎</button>
-        <button class="action-btn del-btn" onclick="deleteTrade('${t.id}')" style="margin-left:4px">✕</button>
+        <button class="action-btn del-btn" onclick="deleteTrade('${t.id}')">✕</button>
       </td>
     </tr>`;
   }).join('');
