@@ -479,7 +479,6 @@ function jsonpGet(params){
 }
 
 // ── no-cors POST via GET with cmd=write ──────────────────────────────
-// Encode payload as base64 in a GET parameter so Apps Script doGet() handles it
 function jsonpWrite(payload){
   return new Promise((resolve, reject) => {
     const cbName = '_tjcb' + (++_cbIdx);
@@ -495,11 +494,22 @@ function jsonpWrite(payload){
       else reject(new Error(data?.error || 'Write error'));
     };
 
-    const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
-    const qs = new URLSearchParams({ cmd:'write', payload: encoded, callback: cbName }).toString();
-    const s  = document.createElement('script');
-    s.src    = SHEET_URL + '?' + qs;
-    s.onerror = () => { clearTimeout(timeout); delete window[cbName]; reject(new Error('Write failed')); };
+    // Safe encode: JSON → UTF-8 bytes → base64 (handles Thai + special chars)
+    let encoded;
+    try {
+      const json = JSON.stringify(payload);
+      // encodeURIComponent converts to %XX, then unescape gives latin1, then btoa works
+      encoded = btoa(encodeURIComponent(json).replace(/%([0-9A-F]{2})/g,
+        (_, p1) => String.fromCharCode('0x' + p1)));
+    } catch(e) {
+      reject(new Error('Encode error: ' + e.message)); return;
+    }
+
+    // Build URL manually to avoid URLSearchParams double-encoding
+    const url = SHEET_URL + '?cmd=write&callback=' + cbName + '&payload=' + encodeURIComponent(encoded);
+    const s   = document.createElement('script');
+    s.src     = url;
+    s.onerror = () => { clearTimeout(timeout); delete window[cbName]; reject(new Error('Write failed — ตรวจสอบ Apps Script URL')); };
     document.head.appendChild(s);
     setTimeout(() => s.remove(), 18000);
   });
