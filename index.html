@@ -523,21 +523,42 @@ async function pushToSheet(silent){
 }
 
 // ── PULL Sheets → local ──────────────────────────────────────────────
+// Smart sync: ถ้า Sheets ว่าง → push ข้อมูล local ขึ้นไปก่อน
+//             ถ้า Sheets มีข้อมูล → pull ลงมาแทน local
 async function pullFromSheet(){
   if(!SHEET_URL || isSyncing) return;
   isSyncing = true; updateSyncUI('syncing');
   try {
+    // ── 1. ดึง accounts ──────────────────────────────────────────────
     const remoteAccounts = await jsonpGet({ action:'get_accounts' });
-    if(remoteAccounts?.length){ accounts = remoteAccounts; LS.set('tj_accounts', accounts); }
+    const sheetsHasAccounts = remoteAccounts && remoteAccounts.length > 0;
 
+    if(sheetsHasAccounts){
+      accounts = remoteAccounts;
+      LS.set('tj_accounts', accounts);
+    }
+
+    // ── 2. ดึง trades ────────────────────────────────────────────────
     const remoteTrades = await jsonpGet({ action:'get_trades', account: currentAcct().name });
-    if(remoteTrades){ trades = remoteTrades; recomputeNet(); LS.set(acctKey(), trades); }
+    const sheetsHasTrades = remoteTrades && remoteTrades.length > 0;
 
-    lastSyncAt = new Date().toISOString();
-    LS.set('tj_last_sync', lastSyncAt);
-    updateSyncUI('connected');
-    renderAcctBar(); renderDashboard();
-    toast('✓ Sync สำเร็จ');
+    if(sheetsHasTrades){
+      // Sheets มีข้อมูล → ใช้ข้อมูลจาก Sheets
+      trades = remoteTrades;
+      recomputeNet();
+      LS.set(acctKey(), trades);
+      lastSyncAt = new Date().toISOString();
+      LS.set('tj_last_sync', lastSyncAt);
+      updateSyncUI('connected');
+      renderAcctBar(); renderDashboard();
+      toast('✓ ดึงข้อมูลจาก Google Sheets แล้ว');
+    } else {
+      // Sheets ว่างอยู่ → push ข้อมูล local ขึ้นไปแทน
+      isSyncing = false; // reset ก่อน push
+      toast('Sheets ว่าง — กำลังอัปโหลดข้อมูลของคุณขึ้น Sheets...');
+      await pushToSheet(false);
+    }
+
   } catch(e){
     updateSyncUI('error', e.message);
     toast('❌ ' + e.message, true);
