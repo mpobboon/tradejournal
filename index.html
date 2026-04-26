@@ -564,8 +564,8 @@ async function pullFromSheet(){
     const sheetsHasTrades = remoteTrades && remoteTrades.length > 0;
 
     if(sheetsHasTrades){
-      // Sheets มีข้อมูล → ใช้ข้อมูลจาก Sheets
-      trades = remoteTrades;
+      // Clean encoding/date issues from Sheets before storing
+      trades = remoteTrades.map(cleanTrade);
       recomputeNet();
       LS.set(acctKey(), trades);
       lastSyncAt = new Date().toISOString();
@@ -637,6 +637,63 @@ function uid(){ return 'id_'+Date.now()+'_'+Math.random().toString(36).slice(2,7
 function save(){ LS.set(acctKey(), trades); LS.set('tj_accounts', accounts); LS.set('tj_current_acct', currentAcctId); schedulePush(); }
 function $ (v){ return (v>=0?'+$':'-$')+Math.abs(v).toFixed(2); }
 function $n(v){ return (v>=0?'$':'-$')+Math.abs(v).toFixed(2); }
+
+// ── FIX DATA FROM SHEETS ─────────────────────────────────────────────
+// Sheets returns ISO dates, garbled Thai (latin1 misread as UTF-8), broken emoji
+function fixStr(s){
+  if(!s || typeof s !== 'string') return s;
+  // Fix garbled UTF-8 read as latin1 (common from Apps Script)
+  try {
+    // If string contains latin1-encoded Thai chars (range 0xC0-0xFF sequences)
+    if(/[\xC0-\xFF]/.test(s)){
+      const bytes = Array.from(s).map(c => c.charCodeAt(0));
+      return decodeURIComponent(bytes.map(b => '%' + b.toString(16).padStart(2,'0')).join(''));
+    }
+  } catch(e) {}
+  return s;
+}
+
+function fixDate(d){
+  if(!d) return '';
+  // ISO format: 2026-04-19T17:00:00.000Z → 2026-04-20 (add timezone offset)
+  if(typeof d === 'string' && d.includes('T')){
+    // Parse as UTC then format as local date YYYY-MM-DD
+    const dt = new Date(d);
+    // Use UTC+7 offset (Bangkok) — adjust by adding 7 hours
+    const local = new Date(dt.getTime() + 7*60*60*1000);
+    return local.toISOString().slice(0,10);
+  }
+  return String(d).slice(0,10);
+}
+
+function fixEmoji(s){
+  if(!s) return '😐';
+  // Fix broken emoji: ðŸ˜ → proper emoji via codepoint repair
+  try {
+    if(s.charCodeAt(0) > 127 && !s.match(/[\u{1F300}-\u{1FFFF}]/u)){
+      const bytes = Array.from(s).map(c => c.charCodeAt(0));
+      const fixed = decodeURIComponent(bytes.map(b => '%' + b.toString(16).padStart(2,'0')).join(''));
+      return fixed || s;
+    }
+  } catch(e) {}
+  return s;
+}
+
+function cleanTrade(t){
+  // Fix all string fields that may have encoding issues
+  return {
+    ...t,
+    date:    fixDate(t.date),
+    trend:   fixStr(t.trend)   || 'Sideways',
+    zone:    fixStr(t.zone)    || 'POI',
+    confirm: fixStr(t.confirm) || '✅',
+    emo:     fixEmoji(fixStr(t.emo)) || '😐',
+    mistake: fixStr(t.mistake) || '',
+    notes:   fixStr(t.notes)   || '',
+    session: fixStr(t.session) || 'Other',
+    side:    fixStr(t.side)    || '',
+  };
+}
 
 // ── ACCOUNT RENDERING ────────────────────────────────────────────────
 function renderAcctBar(){
