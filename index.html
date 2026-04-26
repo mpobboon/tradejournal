@@ -515,17 +515,28 @@ function jsonpWrite(payload){
   });
 }
 
-// ── PUSH local → Sheets ──────────────────────────────────────────────
+// ── PUSH local → Sheets (chunked to avoid URL length limit) ──────────
 async function pushToSheet(silent){
   if(!SHEET_URL || isSyncing) return;
   isSyncing = true;
   if(!silent) updateSyncUI('syncing');
   try {
-    await jsonpWrite({ action:'save_trades',   account: currentAcct().name, trades });
+    // Push accounts first
     await jsonpWrite({ action:'save_accounts', accounts });
+
+    // Push trades in chunks of 5 to avoid URL length limit
+    const CHUNK = 5;
+    // First chunk: replace all (action: save_trades clears existing)
+    for(let i = 0; i < trades.length; i += CHUNK){
+      const chunk = trades.slice(i, i + CHUNK);
+      const action = i === 0 ? 'save_trades' : 'append_trades';
+      await jsonpWrite({ action, account: currentAcct().name, trades: chunk });
+    }
+
     lastSyncAt = new Date().toISOString();
     LS.set('tj_last_sync', lastSyncAt);
     updateSyncUI('connected');
+    if(!silent) toast('✓ Sync สำเร็จ — ' + trades.length + ' trades');
   } catch(e){
     updateSyncUI('error', e.message);
     if(!silent) toast('❌ Push failed: ' + e.message, true);
