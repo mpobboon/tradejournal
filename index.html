@@ -305,6 +305,7 @@ nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:
       </table>
     </div>
     <div class="pagination" id="pagination"></div>
+  </div>
 
   <!-- ADD TRADE -->
   <div class="page" id="page-add">
@@ -808,7 +809,6 @@ function renderDashboard(){
   const ret=(s.net/capital*100).toFixed(2);
   const dailyGoal=parseFloat(document.getElementById('goal-daily')?.value||50);
   const weeklyGoal=parseFloat(document.getElementById('goal-weekly')?.value||200);
-
   document.getElementById('kpi-grid').innerHTML=[
     {label:'STARTING CAPITAL',val:'$'+capital.toLocaleString(),sub:ac.name,cls:'blue'},
     {label:'CURRENT BALANCE',val:'$'+balance.toFixed(0),sub:`${ret>=0?'+':''}${ret}% return`,cls:balance>=capital?'green':'red'},
@@ -1070,10 +1070,15 @@ function resetForm(){
 
 // ── DAILY ────────────────────────────────────────────────────────────
 function renderDaily(){
+  try {
   const byDate={};
-  trades.forEach(t=>{ if(!byDate[t.date]) byDate[t.date]=[]; byDate[t.date].push(t); });
+  trades.forEach(t=>{
+    const d = fixDate(t.date)||t.date||'unknown';
+    if(!byDate[d]) byDate[d]=[];
+    byDate[d].push(t);
+  });
   const dailyGoal=parseFloat(document.getElementById('goal-daily')?.value||50);
-  const dates=Object.keys(byDate).sort().reverse();
+  const dates=Object.keys(byDate).filter(d=>d!=='unknown').sort().reverse();
   const maxAbs=Math.max(...dates.map(d=>Math.abs(byDate[d].reduce((a,t)=>a+t.pnl,0))),1);
   document.getElementById('daily-grid').innerHTML=dates.map(d=>{
     const ts=byDate[d],pnl=ts.reduce((a,t)=>a+t.pnl,0);
@@ -1083,19 +1088,28 @@ function renderDaily(){
     const pct=Math.abs(pnl)/maxAbs*100; const hit=pnl>=dailyGoal;
     return `<div class="day-row"><span class="day-date">${d}</span><span class="day-pnl" style="color:${col}">${$(pnl)}</span><div class="day-bar-wrap"><div class="day-bar-track"><div class="day-bar-fill" style="width:${pct}%;background:${col}"></div></div></div><div class="day-stats"><span>${ts.length} trades</span><span>${wr}% WR</span><span>${wins}W/${losses}L</span></div><span class="day-goal ${hit?'goal-hit':'goal-miss'}">${hit?'HIT':'miss'}</span></div>`;
   }).join('');
+
   const weeks={};
-  trades.forEach(t=>{ const d=new Date(t.date),wk=`W${getWeekNum(d)} ${d.toISOString().slice(0,7)}`; if(!weeks[wk]) weeks[wk]=[]; weeks[wk].push(t); });
+  trades.forEach(t=>{
+    try{
+      const d=new Date(fixDate(t.date)||t.date);
+      if(isNaN(d)) return;
+      const wk=`W${getWeekNum(d)} ${d.toISOString().slice(0,7)}`;
+      if(!weeks[wk]) weeks[wk]=[]; weeks[wk].push(t);
+    }catch(e){}
+  });
   document.getElementById('weekly-tbody').innerHTML=Object.entries(weeks).map(([w,ts])=>{
     const s2=stats(ts);const col=s2.net>0?'#00e5a0':s2.net<0?'#ff5f6d':'#7a85a0';
     return `<tr><td>${w}</td><td>${s2.total}</td><td>${s2.wins}</td><td>${s2.losses}</td><td>${s2.winRate}%</td><td style="color:${col};font-weight:600">${$(s2.net)}</td></tr>`;
   }).join('');
+  } catch(e){ console.error('renderDaily error:',e); }
 }
-function getWeekNum(d){ const s=new Date(d.getFullYear(),0,1); return Math.ceil(((d-s)/864e5+s.getDay()+1)/7); }
 
 // ── SESSION ──────────────────────────────────────────────────────────
 function renderSession(){
+  try {
   const sessions=['Asian (02-09)','London (15-18)','NY (20-23)','Overlap (20-23)','Other'];
-  const sData={}; sessions.forEach(s=>{sData[s]=trades.filter(t=>t.session===s);});
+  const sData={}; sessions.forEach(s=>{sData[s]=trades.filter(t=>fixStr(t.session)===s||t.session===s);});
   document.getElementById('session-grid').innerHTML=sessions.map(sn=>{
     const ts=sData[sn];
     if(!ts.length) return `<div class="session-card"><div class="session-name">${sn}</div><div style="color:var(--dim);font-size:12px">ไม่มี trade</div></div>`;
@@ -1103,42 +1117,63 @@ function renderSession(){
     return `<div class="session-card"><div class="session-name">${sn}</div><div class="session-wr" style="color:${col}">${s2.winRate}%</div><div class="session-sub">${ts.length} trades · ${s2.wins}W/${s2.losses}L</div><div class="session-pnl" style="color:${s2.net>=0?'#00e5a0':'#ff5f6d'}">${$(s2.net)} net</div></div>`;
   }).join('');
   const hours={};
-  trades.forEach(t=>{ const h=parseInt(t.start?.split(':')[0]||0),slot=`${String(h).padStart(2,'0')}:00`;
+  trades.forEach(t=>{
+    const raw = cleanTime(t.start);
+    const h=parseInt(raw?.split(':')[0]||0);
+    const slot=`${String(h).padStart(2,'0')}:00`;
     if(!hours[slot]) hours[slot]={pnl:0,count:0,wins:0};
-    hours[slot].pnl+=t.pnl; hours[slot].count++; if(t.pnl>0)hours[slot].wins++; });
-  const maxP=Math.max(...Object.values(hours).map(h=>Math.abs(h.pnl)),1);
+    hours[slot].pnl+=t.pnl; hours[slot].count++; if(t.pnl>0)hours[slot].wins++;
+  });
+  const vals=Object.values(hours).map(h=>Math.abs(h.pnl));
+  const maxP=vals.length?Math.max(...vals,1):1;
   document.getElementById('time-breakdown').innerHTML=Object.entries(hours).sort().map(([slot,h])=>{
     const col=h.pnl>0?'#00e5a0':h.pnl<0?'#ff5f6d':'#7a85a0';
     const pct=Math.abs(h.pnl)/maxP*100,wr=h.count?(h.wins/h.count*100).toFixed(0):0;
     return `<div style="display:flex;align-items:center;gap:12px"><span style="font-family:var(--mono);font-size:11px;color:var(--text2);width:55px;flex-shrink:0">${slot}</span><div style="flex:1;height:5px;background:var(--dim);border-radius:2px;overflow:hidden"><div style="width:${pct}%;height:100%;background:${col};border-radius:2px"></div></div><span style="font-family:var(--mono);font-size:10px;color:${col};width:60px;text-align:right">${$(h.pnl)}</span><span style="font-family:var(--mono);font-size:10px;color:var(--muted);width:55px">${h.count}T · ${wr}%</span></div>`;
   }).join('');
+  } catch(e){ console.error('renderSession error:',e); }
 }
 
 // ── MISTAKES ─────────────────────────────────────────────────────────
 function renderMistakes(){
+  try {
   const mData={};
-  trades.filter(t=>t.mistake).forEach(t=>{ if(!mData[t.mistake]) mData[t.mistake]={count:0,pnl:0}; mData[t.mistake].count++; mData[t.mistake].pnl+=t.pnl; });
+  trades.filter(t=>t.mistake).forEach(t=>{
+    const mk=fixStr(t.mistake);
+    if(!mk) return;
+    if(!mData[mk]) mData[mk]={count:0,pnl:0};
+    mData[mk].count++; mData[mk].pnl+=t.pnl;
+  });
+  if(!Object.keys(mData).length){
+    document.getElementById('mistake-grid').innerHTML='<div style="color:var(--muted);font-size:13px;padding:8px">ไม่มี mistake ที่บันทึกไว้</div>';
+    document.getElementById('mistake-tbody').innerHTML='';
+    return;
+  }
   const maxC=Math.max(...Object.values(mData).map(m=>m.count),1);
   document.getElementById('mistake-grid').innerHTML=Object.entries(mData).sort((a,b)=>b[1].count-a[1].count).map(([mk,m])=>{
     const col=m.pnl>=0?'#ffb347':'#ff5f6d';
     return `<div class="mistake-card"><div class="mistake-header"><span class="mistake-name">${mk}</span><span class="mistake-count" style="color:${col}">${m.count}</span></div><div class="mistake-bar-track"><div class="mistake-bar-fill" style="width:${m.count/maxC*100}%;background:${col}"></div></div><div class="mistake-impact">Impact: <span style="color:${col}">${$(m.pnl)}</span></div></div>`;
   }).join('');
   document.getElementById('mistake-tbody').innerHTML=trades.filter(t=>t.mistake).map(t=>`
-    <tr><td class="td-date">${t.date}</td><td class="${t.side==='BUY'?'side-buy':'side-sell'}">${t.side}</td><td><span class="mistake-badge">${t.mistake}</span></td><td class="${t.pnl>0?'pnl-pos':'pnl-neg'}">${$(t.pnl)}</td><td class="td-note">${t.notes||'—'}</td></tr>`).join('');
+    <tr><td class="td-date">${fixDate(t.date)}</td><td class="${t.side==='BUY'?'side-buy':'side-sell'}">${t.side}</td><td><span class="mistake-badge">${fixStr(t.mistake)}</span></td><td class="${t.pnl>0?'pnl-pos':'pnl-neg'}">${$(t.pnl)}</td><td class="td-note">${fixStr(t.notes)||'—'}</td></tr>`).join('');
+  } catch(e){ console.error('renderMistakes error:',e); }
 }
 
 // ── INSIGHTS ─────────────────────────────────────────────────────────
 function renderInsights(){
+  try {
   const s=stats();
-  const withConf=trades.filter(t=>t.confirm==='✅'),noConf=trades.filter(t=>t.confirm==='❌');
+  // Handle both ✅❌ and text versions after encoding fix
+  const withConf=trades.filter(t=>String(t.confirm).includes('✅')||String(t.confirm).includes('TRUE')||t.confirm==='✅');
+  const noConf=trades.filter(t=>String(t.confirm).includes('❌')||t.confirm==='❌');
   const confWR=withConf.length?(withConf.filter(t=>t.pnl>0).length/withConf.length*100).toFixed(0):0;
   const noConfWR=noConf.length?(noConf.filter(t=>t.pnl>0).length/noConf.length*100).toFixed(0):0;
   const zS={};
-  trades.forEach(t=>{ if(!zS[t.zone]) zS[t.zone]={w:0,l:0,pnl:0}; zS[t.zone].pnl+=t.pnl; if(t.pnl>0)zS[t.zone].w++; else if(t.pnl<0)zS[t.zone].l++; });
+  trades.forEach(t=>{ const z=fixStr(t.zone)||'?'; if(!zS[z]) zS[z]={w:0,l:0,pnl:0}; zS[z].pnl+=t.pnl; if(t.pnl>0)zS[z].w++; else if(t.pnl<0)zS[z].l++; });
   const bZ=Object.entries(zS).sort((a,b)=>b[1].pnl-a[1].pnl)[0];
   const wZ=Object.entries(zS).sort((a,b)=>a[1].pnl-b[1].pnl)[0];
   const eS={};
-  trades.forEach(t=>{ if(!eS[t.emo]) eS[t.emo]={w:0,total:0}; eS[t.emo].total++; if(t.pnl>0)eS[t.emo].w++; });
+  trades.forEach(t=>{ const em=fixEmoji(fixStr(t.emo))||'😐'; if(!eS[em]) eS[em]={w:0,total:0}; eS[em].total++; if(t.pnl>0)eS[em].w++; });
   const bE=Object.entries(eS).sort((a,b)=>(b[1].w/b[1].total)-(a[1].w/a[1].total))[0];
   const hQ=trades.filter(t=>t.quality>=4),lQ=trades.filter(t=>t.quality<=2);
   const hQwr=hQ.length?(hQ.filter(t=>t.pnl>0).length/hQ.length*100).toFixed(0):0;
@@ -1158,6 +1193,7 @@ function renderInsights(){
     {icon:'🔥',title:`Max Win Streak: ${maxWin}`,body:`${maxWin>=5?'ยอดเยี่ยม! ระวัง overconfidence':'พัฒนา consistency ต่อไป'}`},
     {icon:'💡',title:'Expectancy / trade',body:`= <strong style="color:var(--green)">$${exp}/trade</strong><br>${parseFloat(exp)>0?'✅ Positive — strategy ใช้ได้':'❌ แก้ RR หรือ win rate ก่อน'}`},
   ].map(i=>`<div class="insight"><div class="insight-icon">${i.icon}</div><div class="insight-title">${i.title}</div><div class="insight-body">${i.body}</div></div>`).join('');
+  } catch(e){ console.error('renderInsights error:',e); }
 }
 
 // ── EXPORT / IMPORT ──────────────────────────────────────────────────
@@ -1187,9 +1223,24 @@ function handleImport(e){
 function showPage(id,btn){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-  document.getElementById('page-'+id).classList.add('active');
+  const pg = document.getElementById('page-'+id);
+  if(!pg) return;
+  pg.classList.add('active');
   if(btn) btn.classList.add('active');
-  ({dashboard:renderDashboard,log:renderLog,daily:renderDaily,session:renderSession,mistakes:renderMistakes,insights:renderInsights})[id]?.();
+  try {
+    const renders = {
+      dashboard: renderDashboard,
+      log:       renderLog,
+      add:       ()=>{}, // form page — no render needed
+      daily:     renderDaily,
+      session:   renderSession,
+      mistakes:  renderMistakes,
+      insights:  renderInsights,
+    };
+    renders[id]?.();
+  } catch(e) {
+    console.error('Render error on page:', id, e);
+  }
 }
 
 // close modals on bg click
