@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Trading Journal</title>
+<title>MPP Journal</title>
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -216,18 +216,41 @@ textarea{resize:vertical;min-height:64px}
 /* Progress ring */
 .ring-wrap{display:flex;justify-content:center;align-items:center;flex-direction:column;gap:8px;padding:10px 0}
 .ring-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;font-family:var(--mono)}
+
+/* Report */
+.report-period{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:14px}
+.report-period-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px}
+.report-period-title{font-family:var(--mono);font-size:14px;font-weight:700}
+.report-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-bottom:12px}
+.report-stat{background:var(--surface2);border-radius:7px;padding:10px 12px}
+.report-stat-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;font-family:var(--mono);margin-bottom:4px}
+.report-stat-val{font-family:var(--mono);font-size:16px;font-weight:700}
+.report-mistakes{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.report-mistake-tag{background:rgba(251,146,60,.12);color:var(--orange);border:1px solid rgba(251,146,60,.2);border-radius:4px;padding:2px 8px;font-size:11px;font-family:var(--mono)}
+.report-lesson{background:rgba(74,222,128,.05);border-left:3px solid var(--accent);border-radius:0 6px 6px 0;padding:8px 12px;font-size:12px;color:var(--muted);margin-top:10px;line-height:1.6}
+.period-badge{display:inline-flex;padding:3px 10px;border-radius:4px;font-size:11px;font-family:var(--mono);font-weight:700}
+.period-badge.profit{background:rgba(74,222,128,.12);color:var(--accent)}
+.period-badge.loss{background:rgba(248,113,113,.12);color:var(--red)}
+
+/* Mistake pattern */
+.pattern-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(42,47,62,.4)}
+.pattern-row:last-child{border:none}
+.pattern-arrow{color:var(--muted);font-size:10px}
+.pattern-count{font-family:var(--mono);font-size:11px;color:var(--orange);margin-left:auto}
 </style>
 </head>
 <body>
 <div class="app">
   <!-- HEADER -->
   <header class="header">
-    <div class="logo">TJ<span>/v1</span></div>
+    <div class="logo">MPP<span> JOURNAL</span></div>
     <nav class="nav">
       <button class="nav-btn active" onclick="switchPage('dashboard',this)">Dashboard</button>
       <button class="nav-btn" onclick="switchPage('tradelog',this)">Trade Log</button>
       <button class="nav-btn" onclick="switchPage('addtrade',this)">+ Add Trade</button>
       <button class="nav-btn" onclick="switchPage('insights',this)">Insights</button>
+      <button class="nav-btn" onclick="switchPage('mistakes',this)">⚠ Mistakes</button>
+      <button class="nav-btn" onclick="switchPage('report',this)">📋 Report</button>
     </nav>
     <div class="header-right">
       <button class="btn btn-ghost btn-sm" onclick="exportCSV()">↓ CSV</button>
@@ -433,7 +456,55 @@ textarea{resize:vertical;min-height:64px}
     <div class="page" id="page-insights">
       <div class="insights-grid" id="insightsGrid"></div>
     </div>
-  </main>
+
+    <!-- MISTAKES -->
+    <div class="page" id="page-mistakes">
+      <div class="stats-grid" id="mistakeStats"></div>
+      <div class="charts-grid" style="grid-template-columns:1fr 1fr;margin-bottom:12px">
+        <div class="chart-card">
+          <div class="chart-title">⚠ Mistake Frequency</div>
+          <div class="bar-chart" id="mistakeFreqChart"></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">💸 P&L Cost ของแต่ละ Mistake</div>
+          <div class="bar-chart" id="mistakeCostChart"></div>
+        </div>
+      </div>
+      <div class="charts-grid" style="grid-template-columns:1fr 1fr;margin-bottom:12px">
+        <div class="chart-card">
+          <div class="chart-title">📅 Mistake Timeline (รายวัน)</div>
+          <canvas id="mistakeTimelineChart" style="max-height:160px"></canvas>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">🔄 Mistake หลัง Mistake (Pattern)</div>
+          <div id="mistakePatternWrap" style="font-size:12px;color:var(--muted)"></div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <div class="table-header"><span class="table-title">Trades ที่มี Mistake</span></div>
+        <div class="table-scroll">
+          <table><thead><tr><th>#</th><th>Date</th><th>Side</th><th>Mistake</th><th>P&L</th><th>Confirm</th><th>Emotion</th><th>Notes</th></tr></thead>
+          <tbody id="mistakeTableBody"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- REPORT -->
+    <div class="page" id="page-report">
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
+        <div class="chart-card" style="flex:0 0 auto;padding:10px 14px;margin:0">
+          <div style="display:flex;gap:8px;align-items:center">
+            <label style="font-size:12px;color:var(--muted);text-transform:none;letter-spacing:0">Period:</label>
+            <select id="reportPeriod" onchange="renderReport()" style="background:var(--surface2);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:12px;padding:5px 8px;outline:none">
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="exportReport()">↓ Export Report</button>
+      </div>
+      <div id="reportContent"></div>
+    </div>
 </div>
 
 <!-- DELETE MODAL -->
@@ -596,6 +667,8 @@ function switchPage(id, btn){
   if(id==='dashboard') renderDashboard();
   if(id==='tradelog') renderTable();
   if(id==='insights') renderInsights();
+  if(id==='mistakes') renderMistakePage();
+  if(id==='report') renderReport();
   if(id==='addtrade'){ clearForm(); }
 }
 
@@ -1039,6 +1112,199 @@ function showToast(msg, type='success'){
   const t = document.getElementById('toast');
   t.textContent=msg; t.className='toast '+type+' show';
   setTimeout(()=>t.classList.remove('show'),2800);
+}
+
+// ============================================================
+//  MISTAKE ANALYSIS PAGE
+// ============================================================
+function renderMistakePage(){
+  const mkTrades = trades.filter(t=>t.mistake);
+  const cleanTrades = trades.filter(t=>!t.mistake);
+  const mkWins = mkTrades.filter(t=>t.pnl>0).length;
+  const cleanWins = cleanTrades.filter(t=>t.pnl>0).length;
+  const mkPnL = mkTrades.reduce((a,t)=>a+t.pnl,0);
+  const cleanPnL = cleanTrades.reduce((a,t)=>a+t.pnl,0);
+
+  // Stats
+  document.getElementById('mistakeStats').innerHTML = `
+    <div class="stat-card red"><div class="stat-label">Mistake Trades</div><div class="stat-value red">${mkTrades.length}</div><div class="stat-sub">${trades.length>0?(mkTrades.length/trades.length*100).toFixed(0):0}% ของ trades ทั้งหมด</div></div>
+    <div class="stat-card red"><div class="stat-label">P&L เสียจาก Mistake</div><div class="stat-value red">$${mkPnL}</div><div class="stat-sub">Win Rate: ${mkTrades.length>0?(mkWins/mkTrades.length*100).toFixed(0):0}%</div></div>
+    <div class="stat-card green"><div class="stat-label">P&L ไม่มี Mistake</div><div class="stat-value green">$${cleanPnL}</div><div class="stat-sub">Win Rate: ${cleanTrades.length>0?(cleanWins/cleanTrades.length*100).toFixed(0):0}%</div></div>
+    <div class="stat-card yellow"><div class="stat-label">P&L หากไม่มี Mistake</div><div class="stat-value yellow">$${mkPnL<0?cleanPnL+Math.abs(mkPnL):cleanPnL}</div><div class="stat-sub">ต่างจากจริง $${Math.abs(mkPnL)}</div></div>
+  `;
+
+  // Freq + Cost charts
+  const mkMap = {};
+  mkTrades.forEach(t=>{
+    if(!mkMap[t.mistake]) mkMap[t.mistake]={count:0,pnl:0};
+    mkMap[t.mistake].count++; mkMap[t.mistake].pnl+=t.pnl;
+  });
+  const sorted = Object.entries(mkMap).sort((a,b)=>b[1].count-a[1].count);
+  const maxC = sorted[0]?.[1].count||1;
+  const maxP = Math.max(...sorted.map(([,v])=>Math.abs(v.pnl)),1);
+
+  document.getElementById('mistakeFreqChart').innerHTML = sorted.length
+    ? sorted.map(([m,v])=>`<div class="bar-row"><div class="bar-label" style="font-size:10px;width:100px">${m}</div><div class="bar-track"><div class="bar-fill" style="width:${v.count/maxC*100}%;background:rgba(251,146,60,.6)"></div></div><div class="bar-val" style="color:var(--orange)">${v.count}x</div></div>`).join('')
+    : '<div style="color:var(--muted);font-size:12px;padding:20px;text-align:center">ไม่มี Mistake 🎉</div>';
+
+  document.getElementById('mistakeCostChart').innerHTML = sorted.length
+    ? sorted.map(([m,v])=>`<div class="bar-row"><div class="bar-label" style="font-size:10px;width:100px">${m}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.abs(v.pnl)/maxP*100}%;background:${v.pnl>=0?'rgba(74,222,128,.5)':'rgba(248,113,113,.5)'}"></div></div><div class="bar-val ${v.pnl>=0?'pnl-pos':'pnl-neg'}">${v.pnl>0?'+':''}$${v.pnl}</div></div>`).join('')
+    : '';
+
+  // Timeline chart
+  destroyChart('mkTimeline');
+  const byDate = {};
+  mkTrades.forEach(t=>{ byDate[t.date]=(byDate[t.date]||0)+1; });
+  const dates = Object.keys(byDate).sort();
+  if(dates.length){
+    const ctx = document.getElementById('mistakeTimelineChart').getContext('2d');
+    chartInstances['mkTimeline'] = new Chart(ctx,{
+      type:'bar',
+      data:{labels:dates.map(d=>d.slice(5)),datasets:[{data:dates.map(d=>byDate[d]),backgroundColor:'rgba(251,146,60,.6)',borderRadius:4}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+        scales:{x:{ticks:{color:'#6b7592',font:{size:10}}},y:{ticks:{color:'#6b7592',stepSize:1},grid:{color:'rgba(255,255,255,0.04)'}}}}
+    });
+  }
+
+  // Pattern: mistake → next trade result
+  const patternMap = {};
+  for(let i=0;i<trades.length-1;i++){
+    if(trades[i].mistake){
+      const mk = trades[i].mistake;
+      const nextResult = trades[i+1].pnl>0?'Win':'Loss';
+      const key = mk+' → '+nextResult;
+      patternMap[key]=(patternMap[key]||0)+1;
+    }
+  }
+  const patternEl = document.getElementById('mistakePatternWrap');
+  const patterns = Object.entries(patternMap).sort((a,b)=>b[1]-a[1]);
+  patternEl.innerHTML = patterns.length
+    ? patterns.map(([k,c])=>{
+        const parts=k.split(' → ');
+        const isLoss=parts[1]==='Loss';
+        return `<div class="pattern-row"><span style="color:var(--orange);font-size:11px;font-family:var(--mono)">${parts[0]}</span><span class="pattern-arrow">→</span><span style="color:${isLoss?'var(--red)':'var(--accent)'};font-size:11px;font-family:var(--mono)">${parts[1]}</span><span class="pattern-count">${c}x</span></div>`;
+      }).join('')
+    : '<div style="padding:20px;text-align:center">ข้อมูลยังไม่พอวิเคราะห์</div>';
+
+  // Table
+  document.getElementById('mistakeTableBody').innerHTML = mkTrades.length
+    ? mkTrades.map(t=>`<tr>
+        <td class="mono" style="color:var(--muted)">${t.id}</td>
+        <td class="mono" style="font-size:11px">${t.date}</td>
+        <td><span class="badge badge-${t.side.toLowerCase()}">${t.side}</span></td>
+        <td><span style="background:rgba(251,146,60,.12);color:var(--orange);padding:2px 8px;border-radius:4px;font-size:11px">${t.mistake}</span></td>
+        <td><span class="${t.pnl>=0?'pnl-pos':'pnl-neg'}">${t.pnl>=0?'+':''}$${t.pnl}</span></td>
+        <td>${t.confirm}</td><td>${t.emotion}</td>
+        <td style="color:var(--muted);font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis">${t.notes||''}</td>
+      </tr>`).join('')
+    : `<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:40px">ไม่มี Mistake 🎉</td></tr>`;
+}
+
+// ============================================================
+//  WEEKLY / MONTHLY REPORT
+// ============================================================
+function groupByPeriod(period){
+  const groups = {};
+  trades.forEach(t=>{
+    let key;
+    if(period==='weekly'){
+      const d = new Date(t.date+'T00:00:00');
+      const day = d.getDay(); // 0=Sun
+      const monday = new Date(d); monday.setDate(d.getDate()-(day===0?6:day-1));
+      key = monday.toISOString().slice(0,10);
+    } else {
+      key = t.date.slice(0,7);
+    }
+    if(!groups[key]) groups[key]=[];
+    groups[key].push(t);
+  });
+  return groups;
+}
+
+function autoLesson(ts){
+  const mistakes = ts.filter(t=>t.mistake);
+  const topMk = {};
+  mistakes.forEach(t=>{ topMk[t.mistake]=(topMk[t.mistake]||0)+1; });
+  const top = Object.entries(topMk).sort((a,b)=>b[1]-a[1])[0];
+  const wr = ts.length>0?(ts.filter(t=>t.pnl>0).length/ts.length*100).toFixed(0):0;
+  const tips = [];
+  if(top) tips.push(`⚠ "${top[0]}" เกิดขึ้น ${top[1]} ครั้ง — ควรระวังให้มากขึ้น`);
+  if(parseFloat(wr)<50) tips.push(`📉 Win Rate ${wr}% ต่ำกว่า 50% — ลองทบทวน setup ที่ใช้`);
+  if(parseFloat(wr)>=75) tips.push(`🌟 Win Rate ${wr}% ดีมาก — รักษา discipline ต่อไป`);
+  const noConfirm = ts.filter(t=>t.confirm==='❌');
+  if(noConfirm.length>2) tips.push(`❌ เข้า ${noConfirm.length} trades โดยไม่มี confirm — ลองรอ signal ให้ชัดขึ้น`);
+  return tips.length ? tips.join('<br>') : '✅ สัปดาห์นี้ไม่มีปัญหาใหญ่';
+}
+
+function renderReport(){
+  const period = document.getElementById('reportPeriod').value;
+  const groups = groupByPeriod(period);
+  const keys = Object.keys(groups).sort().reverse();
+  if(!keys.length){ document.getElementById('reportContent').innerHTML='<div style="color:var(--muted);text-align:center;padding:60px">ยังไม่มีข้อมูล</div>'; return; }
+
+  document.getElementById('reportContent').innerHTML = keys.map(key=>{
+    const ts = groups[key];
+    const wins = ts.filter(t=>t.pnl>0).length;
+    const losses = ts.filter(t=>t.pnl<0).length;
+    const netPnL = ts.reduce((a,t)=>a+t.pnl,0);
+    const wr = ts.length>0?(wins/ts.length*100).toFixed(0):0;
+    const avgRR = ts.length>0?(ts.reduce((a,t)=>a+t.rr,0)/ts.length).toFixed(2):0;
+    const best = ts.length>0?Math.max(...ts.map(t=>t.pnl)):0;
+    const worst = ts.length>0?Math.min(...ts.map(t=>t.pnl)):0;
+    const mistakes = ts.filter(t=>t.mistake);
+    const mkMap = {};
+    mistakes.forEach(t=>{ mkMap[t.mistake]=(mkMap[t.mistake]||0)+1; });
+    const lesson = autoLesson(ts);
+
+    let title;
+    if(period==='weekly'){
+      const from = new Date(key+'T00:00:00');
+      const to = new Date(from); to.setDate(from.getDate()+6);
+      title = `Week ${from.toLocaleDateString('th-TH',{day:'numeric',month:'short'})} – ${to.toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'2-digit'})}`;
+    } else {
+      const [y,m] = key.split('-');
+      title = new Date(y,m-1,1).toLocaleDateString('th-TH',{month:'long',year:'numeric'});
+    }
+
+    return `<div class="report-period">
+      <div class="report-period-header">
+        <span class="report-period-title">${title}</span>
+        <span class="period-badge ${netPnL>=0?'profit':'loss'}">${netPnL>=0?'+':''}$${netPnL}</span>
+      </div>
+      <div class="report-grid">
+        <div class="report-stat"><div class="report-stat-label">Trades</div><div class="report-stat-val blue">${ts.length}</div></div>
+        <div class="report-stat"><div class="report-stat-label">Win Rate</div><div class="report-stat-val ${wr>=50?'green':'red'}">${wr}%</div></div>
+        <div class="report-stat"><div class="report-stat-label">W / L</div><div class="report-stat-val">${wins} / ${losses}</div></div>
+        <div class="report-stat"><div class="report-stat-label">Avg R:R</div><div class="report-stat-val yellow">${avgRR}</div></div>
+        <div class="report-stat"><div class="report-stat-label">Best</div><div class="report-stat-val green">+$${best}</div></div>
+        <div class="report-stat"><div class="report-stat-label">Worst</div><div class="report-stat-val red">$${worst}</div></div>
+        <div class="report-stat"><div class="report-stat-label">Mistakes</div><div class="report-stat-val ${mistakes.length>0?'red orange':'green'}">${mistakes.length}</div></div>
+      </div>
+      ${mistakes.length?`<div style="margin-bottom:8px;font-size:11px;color:var(--muted);font-family:var(--mono)">MISTAKES THIS PERIOD</div>
+        <div class="report-mistakes">${Object.entries(mkMap).map(([m,c])=>`<span class="report-mistake-tag">${m} ×${c}</span>`).join('')}</div>`:''}
+      <div class="report-lesson">${lesson}</div>
+    </div>`;
+  }).join('');
+}
+
+function exportReport(){
+  const period = document.getElementById('reportPeriod').value;
+  const groups = groupByPeriod(period);
+  const keys = Object.keys(groups).sort().reverse();
+  let text = `TRADING JOURNAL — ${period.toUpperCase()} REPORT\nGenerated: ${new Date().toLocaleString('th-TH')}\n${'='.repeat(60)}\n\n`;
+  keys.forEach(key=>{
+    const ts = groups[key];
+    const wins = ts.filter(t=>t.pnl>0).length;
+    const netPnL = ts.reduce((a,t)=>a+t.pnl,0);
+    const wr = ts.length>0?(wins/ts.length*100).toFixed(0):0;
+    const mistakes = ts.filter(t=>t.mistake);
+    text += `${key}\n${'─'.repeat(40)}\nTrades: ${ts.length} | Win Rate: ${wr}% | Net P&L: $${netPnL}\nMistakes: ${mistakes.length} — ${[...new Set(mistakes.map(t=>t.mistake))].join(', ')||'none'}\n\n`;
+  });
+  const blob = new Blob([text],{type:'text/plain;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download=`tj_report_${period}.txt`; a.click();
+  URL.revokeObjectURL(url);
+  showToast('Export Report สำเร็จ','success');
 }
 
 // ============================================================
