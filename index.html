@@ -545,7 +545,12 @@ function loadGistConfig(){
     gistConfig = { token: c.token||'', gistId: c.gistId||'' };
     if(gistConfig.token) document.getElementById('gistToken').value = gistConfig.token;
     if(gistConfig.gistId) document.getElementById('gistId').value = gistConfig.gistId;
-    updateSyncUI(gistConfig.token ? 'ready' : 'none', gistConfig.token ? 'พร้อม Sync — Gist: '+(gistConfig.gistId||'จะสร้างใหม่') : 'ยังไม่ได้ตั้งค่า GitHub Gist');
+    if(gistConfig.token && gistConfig.gistId){
+      // Auto-pull on page load
+      autoSyncFromGist();
+    } else {
+      updateSyncUI('none', 'ยังไม่ได้ตั้งค่า GitHub Gist');
+    }
   }catch(e){}
 }
 
@@ -554,8 +559,53 @@ function saveGistConfig(){
   gistConfig.gistId = document.getElementById('gistId').value.trim();
   if(!gistConfig.token){ showToast('กรุณากรอก GitHub Token','error'); return; }
   localStorage.setItem(GIST_CONFIG_KEY, JSON.stringify(gistConfig));
-  updateSyncUI('ready','บันทึกการตั้งค่าแล้ว — กด Push เพื่ออัปโหลดข้อมูล');
   showToast('บันทึก Gist config แล้ว','success');
+  if(gistConfig.gistId) autoSyncFromGist();
+  else updateSyncUI('ready','พร้อมแล้ว — กด Push เพื่อสร้าง Gist ใหม่');
+}
+
+// Silent auto-push (ไม่แสดง toast ซ้ำ แค่อัปเดต status bar)
+async function autoSyncToGist(){
+  if(!gistConfig.token || !gistConfig.gistId) return;
+  updateSyncUI('loading','กำลัง sync...');
+  try{
+    const body = { description:'MPP Journal Data', public:false,
+      files:{ [GIST_FILENAME]:{ content: JSON.stringify(trades, null, 2) } } };
+    const res = await fetch('https://api.github.com/gists/'+gistConfig.gistId,{
+      method:'PATCH',
+      headers:{ 'Authorization':'token '+gistConfig.token, 'Content-Type':'application/json' },
+      body:JSON.stringify(body)
+    });
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const now = new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});
+    updateSyncUI('ok','✓ Synced '+now);
+  }catch(e){
+    updateSyncUI('err','Sync ล้มเหลว: '+e.message);
+  }
+}
+
+// Silent auto-pull on open
+async function autoSyncFromGist(){
+  if(!gistConfig.token || !gistConfig.gistId) return;
+  updateSyncUI('loading','กำลังโหลดข้อมูลล่าสุด...');
+  try{
+    const res = await fetch('https://api.github.com/gists/'+gistConfig.gistId,{
+      headers:{ 'Authorization':'token '+gistConfig.token }
+    });
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    const file = data.files[GIST_FILENAME];
+    if(!file) throw new Error('ไม่พบไฟล์ใน Gist');
+    const pulled = JSON.parse(file.content);
+    if(!Array.isArray(pulled)) throw new Error('รูปแบบข้อมูลผิด');
+    trades = pulled;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(trades));
+    renderDashboard();
+    const now = new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});
+    updateSyncUI('ok','✓ Synced '+now+' ('+trades.length+' trades)');
+  }catch(e){
+    updateSyncUI('err','โหลดล้มเหลว: '+e.message);
+  }
 }
 
 function updateSyncUI(state, msg){
@@ -567,9 +617,9 @@ function updateSyncUI(state, msg){
 
 async function syncToGist(){
   if(!gistConfig.token){ showToast('กรุณาตั้งค่า Token ก่อน','error'); return; }
-  updateSyncUI('loading','กำลัง Push ข้อมูลขึ้น Gist...');
+  updateSyncUI('loading','กำลัง Push...');
   try{
-    const body = { description:'Trading Journal Data', public:false,
+    const body = { description:'MPP Journal Data', public:false,
       files:{ [GIST_FILENAME]:{ content: JSON.stringify(trades, null, 2) } } };
     let url = 'https://api.github.com/gists';
     let method = 'POST';
@@ -582,11 +632,11 @@ async function syncToGist(){
       document.getElementById('gistId').value = data.id;
       localStorage.setItem(GIST_CONFIG_KEY, JSON.stringify(gistConfig));
     }
-    const now = new Date().toLocaleTimeString('th-TH');
-    updateSyncUI('ok','✓ Push สำเร็จ เวลา '+now+' — Gist: '+gistConfig.gistId);
-    showToast('Push ข้อมูลสำเร็จ ('+trades.length+' trades)','success');
+    const now = new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});
+    updateSyncUI('ok','✓ Pushed '+now);
+    showToast('Push สำเร็จ','success');
   }catch(e){
-    updateSyncUI('err','Push ล้มเหลว: '+e.message);
+    updateSyncUI('err','Push ล้มเหลว');
     showToast('Push ล้มเหลว: '+e.message,'error');
   }
 }
@@ -594,25 +644,8 @@ async function syncToGist(){
 async function syncFromGist(){
   if(!gistConfig.token){ showToast('กรุณาตั้งค่า Token ก่อน','error'); return; }
   if(!gistConfig.gistId){ showToast('กรุณากรอก Gist ID ก่อน','error'); return; }
-  updateSyncUI('loading','กำลัง Pull ข้อมูลจาก Gist...');
-  try{
-    const res = await fetch('https://api.github.com/gists/'+gistConfig.gistId, { headers:{ 'Authorization':'token '+gistConfig.token } });
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    const data = await res.json();
-    const file = data.files[GIST_FILENAME];
-    if(!file) throw new Error('ไม่พบไฟล์ '+GIST_FILENAME+' ใน Gist');
-    const pulled = JSON.parse(file.content);
-    if(!Array.isArray(pulled)) throw new Error('รูปแบบข้อมูลไม่ถูกต้อง');
-    trades = pulled;
-    saveTrades();
-    renderDashboard();
-    const now = new Date().toLocaleTimeString('th-TH');
-    updateSyncUI('ok','✓ Pull สำเร็จ เวลา '+now+' ('+trades.length+' trades)');
-    showToast('Pull ข้อมูลสำเร็จ ('+trades.length+' trades)','success');
-  }catch(e){
-    updateSyncUI('err','Pull ล้มเหลว: '+e.message);
-    showToast('Pull ล้มเหลว: '+e.message,'error');
-  }
+  await autoSyncFromGist();
+  showToast('Pull สำเร็จ ('+trades.length+' trades)','success');
 }
 
 // Pre-loaded sample data from Excel
@@ -653,7 +686,10 @@ function loadTrades(){
     trades = [...SAMPLE_TRADES];
   }
 }
-function saveTrades(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(trades)); }
+function saveTrades(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(trades));
+  if(gistConfig.token && gistConfig.gistId) autoSyncToGist();
+}
 function nextId(){ return trades.length > 0 ? Math.max(...trades.map(t=>t.id))+1 : 1; }
 
 // ============================================================
