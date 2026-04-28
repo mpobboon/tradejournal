@@ -249,6 +249,8 @@ textarea{resize:vertical;min-height:64px}
       <button class="nav-btn" onclick="switchPage('tradelog',this)">Trade Log</button>
       <button class="nav-btn" onclick="switchPage('addtrade',this)">+ Add Trade</button>
       <button class="nav-btn" onclick="switchPage('insights',this)">Insights</button>
+      <button class="nav-btn" onclick="switchPage('session',this)">📅 Session</button>
+      <button class="nav-btn" onclick="switchPage('risk',this)">🎯 Risk</button>
       <button class="nav-btn" onclick="switchPage('mistakes',this)">⚠ Mistakes</button>
       <button class="nav-btn" onclick="switchPage('report',this)">📋 Report</button>
     </nav>
@@ -345,6 +347,108 @@ textarea{resize:vertical;min-height:64px}
 
     <!-- ADD TRADE -->
     <div class="page" id="page-addtrade">
+
+      <!-- 🔔 DAILY LOSS ALERT -->
+      <div id="dailyLossAlert" style="display:none;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.35);border-radius:10px;padding:13px 16px;margin-bottom:12px;display:flex;align-items:center;gap:10px">
+        <span style="font-size:20px">🔴</span>
+        <div>
+          <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--red)" id="dailyLossMsg">Daily Loss Limit ถูกเกิน!</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">แนะนำให้หยุดเทรดวันนี้และทบทวน setup ก่อน</div>
+        </div>
+      </div>
+
+      <!-- 📐 POSITION SIZE CALCULATOR -->
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:12px">
+        <div style="font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:12px">📐 Position Size Calculator</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:12px">
+          <div class="form-group">
+            <label>💰 Account Balance ($)</label>
+            <input type="number" id="ps_balance" step="1" placeholder="เช่น 500" oninput="calcPositionSize()">
+          </div>
+          <div class="form-group">
+            <label>⚠ Risk per Trade (%)</label>
+            <input type="number" id="ps_risk_pct" step="0.1" value="1" min="0.1" max="10" oninput="calcPositionSize()">
+          </div>
+          <div class="form-group">
+            <label>⬆ Entry Price</label>
+            <input type="number" id="ps_entry" step="0.1" placeholder="เช่น 4700" oninput="calcPositionSize()">
+          </div>
+          <div class="form-group">
+            <label>🛡 SL Price</label>
+            <input type="number" id="ps_sl" step="0.1" placeholder="เช่น 4695" oninput="calcPositionSize()">
+          </div>
+          <div class="form-group">
+            <label>🔔 Daily Loss Limit ($)</label>
+            <input type="number" id="ps_daylimit" step="1" placeholder="เช่น 20" oninput="saveDayLimit()">
+          </div>
+        </div>
+        <div id="psResult" style="display:none;background:var(--surface2);border-radius:8px;padding:12px 16px">
+          <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:center">
+            <div>
+              <div style="font-size:10px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px">Recommended Lot</div>
+              <div id="ps_lot_result" style="font-family:var(--mono);font-size:28px;font-weight:700;color:var(--accent)">—</div>
+            </div>
+            <div style="width:1px;height:40px;background:var(--border)"></div>
+            <div style="display:flex;gap:16px;flex-wrap:wrap">
+              <div><div style="font-size:10px;color:var(--muted);font-family:var(--mono);margin-bottom:2px">Risk $</div><div id="ps_risk_dollar" style="font-family:var(--mono);font-size:14px;font-weight:700;color:var(--red)">—</div></div>
+              <div><div style="font-size:10px;color:var(--muted);font-family:var(--mono);margin-bottom:2px">SL Pips</div><div id="ps_sl_pips" style="font-family:var(--mono);font-size:14px;font-weight:700;color:var(--yellow)">—</div></div>
+              <div><div style="font-size:10px;color:var(--muted);font-family:var(--mono);margin-bottom:2px">Value/Pip</div><div id="ps_pip_val" style="font-family:var(--mono);font-size:14px;font-weight:700;color:var(--blue)">—</div></div>
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="applyPositionSize()" style="margin-left:auto">↙ ใช้ค่านี้</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ⚡ LIVE CALCULATOR -->
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:12px">
+        <div style="font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:12px">⚡ Live Calculator</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:12px">
+          <div class="form-group">
+            <label>↕ Side</label>
+            <div class="side-toggle">
+              <button class="side-btn buy" onclick="setSide('BUY',this)">BUY</button>
+              <button class="side-btn sell" onclick="setSide('SELL',this)">SELL</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>📦 Lot</label>
+            <input type="number" id="f_lot" step="0.01" min="0.01" placeholder="0.01" oninput="liveCalc()">
+          </div>
+          <div class="form-group">
+            <label>⬆ Entry</label>
+            <input type="number" id="f_entry" step="0.1" oninput="liveCalc()">
+          </div>
+          <div class="form-group">
+            <label>⬇ Exit</label>
+            <input type="number" id="f_exit" step="0.1" oninput="liveCalc()">
+          </div>
+          <div class="form-group">
+            <label>🛡 SL</label>
+            <input type="number" id="f_sl" step="0.1" oninput="liveCalc()">
+          </div>
+          <div class="form-group">
+            <label>🎯 TP</label>
+            <input type="number" id="f_tp" step="0.1" oninput="liveCalc()">
+          </div>
+        </div>
+        <!-- Result bar -->
+        <div id="calcResult" style="display:none;background:var(--surface2);border-radius:8px;padding:12px 16px;flex-wrap:wrap;gap:16px;align-items:center">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+            <span style="font-size:10px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.6px">P&L</span>
+            <span id="rc_pnl" style="font-family:var(--mono);font-size:26px;font-weight:700;line-height:1">—</span>
+          </div>
+          <div style="width:1px;height:40px;background:var(--border);flex-shrink:0"></div>
+          <div style="display:flex;gap:20px;flex-wrap:wrap">
+            <div><div style="font-size:10px;color:var(--muted);font-family:var(--mono);margin-bottom:2px">R:R</div><div id="rc_rr" style="font-family:var(--mono);font-size:15px;font-weight:700;color:var(--yellow)">—</div></div>
+            <div><div style="font-size:10px;color:var(--muted);font-family:var(--mono);margin-bottom:2px">Risk $</div><div id="rc_risk" style="font-family:var(--mono);font-size:15px;font-weight:700;color:var(--red)">—</div></div>
+            <div><div style="font-size:10px;color:var(--muted);font-family:var(--mono);margin-bottom:2px">Reward $</div><div id="rc_reward" style="font-family:var(--mono);font-size:15px;font-weight:700;color:var(--accent)">—</div></div>
+            <div><div style="font-size:10px;color:var(--muted);font-family:var(--mono);margin-bottom:2px">Pips</div><div id="rc_pips" style="font-family:var(--mono);font-size:15px;font-weight:700;color:var(--blue)">—</div></div>
+            <div><div style="font-size:10px;color:var(--muted);font-family:var(--mono);margin-bottom:2px">New Balance</div><div id="rc_bal" style="font-family:var(--mono);font-size:15px;font-weight:700;color:var(--purple)">—</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DETAILS FORM -->
       <div class="form-card">
         <div class="form-title" id="formTitle">+ เพิ่ม Trade ใหม่</div>
         <div class="form-grid">
@@ -361,35 +465,18 @@ textarea{resize:vertical;min-height:64px}
             <input type="time" id="f_end">
           </div>
           <div class="form-group">
-            <label>↕ Side</label>
-            <div class="side-toggle">
-              <button class="side-btn buy" onclick="setSide('BUY',this)">BUY</button>
-              <button class="side-btn sell" onclick="setSide('SELL',this)">SELL</button>
-            </div>
+            <label>💰 P&L ($) <span style="color:var(--accent);font-size:10px">● auto</span></label>
+            <input type="number" id="f_pnl" step="0.01" placeholder="คำนวณจาก Calculator ด้านบน" style="color:var(--accent)">
           </div>
           <div class="form-group">
-            <label>📦 Lot</label>
-            <input type="number" id="f_lot" step="0.01" min="0.01" placeholder="0.01">
-          </div>
-          <div class="form-group">
-            <label>⬆ Entry Price</label>
-            <input type="number" id="f_entry" step="0.1">
-          </div>
-          <div class="form-group">
-            <label>⬇ Exit Price</label>
-            <input type="number" id="f_exit" step="0.1">
-          </div>
-          <div class="form-group">
-            <label>🛡 SL Price</label>
-            <input type="number" id="f_sl" step="0.1">
-          </div>
-          <div class="form-group">
-            <label>🎯 TP Price</label>
-            <input type="number" id="f_tp" step="0.1">
-          </div>
-          <div class="form-group">
-            <label>💰 P&L ($)</label>
-            <input type="number" id="f_pnl" step="0.01" placeholder="คำนวณอัตโนมัติ">
+            <label>📅 Session</label>
+            <select id="f_session">
+              <option value="">-- Auto --</option>
+              <option>Asian</option>
+              <option>London</option>
+              <option>New York</option>
+              <option>London/NY</option>
+            </select>
           </div>
           <div class="form-group">
             <label>📈 Trend (M15)</label>
@@ -485,6 +572,88 @@ textarea{resize:vertical;min-height:64px}
         <div class="table-scroll">
           <table><thead><tr><th>#</th><th>Date</th><th>Side</th><th>Mistake</th><th>P&L</th><th>Confirm</th><th>Emotion</th><th>Notes</th></tr></thead>
           <tbody id="mistakeTableBody"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- SESSION ANALYSIS -->
+    <div class="page" id="page-session">
+      <div class="stats-grid" id="sessionStats"></div>
+      <div class="charts-grid" style="grid-template-columns:1fr 1fr;margin-bottom:12px">
+        <div class="chart-card">
+          <div class="chart-title">📊 Net P&L by Session</div>
+          <canvas id="sessionPnlChart" style="max-height:180px"></canvas>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">🎯 Win Rate by Session</div>
+          <canvas id="sessionWrChart" style="max-height:180px"></canvas>
+        </div>
+      </div>
+      <div class="charts-grid" style="grid-template-columns:1fr 1fr;margin-bottom:12px">
+        <div class="chart-card">
+          <div class="chart-title">📈 Trades per Session</div>
+          <canvas id="sessionCountChart" style="max-height:160px"></canvas>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">⏰ Hourly P&L Heatmap (เวลา ICT +7)</div>
+          <div id="hourlyHeatmap"></div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <div class="table-header"><span class="table-title">Session Breakdown</span></div>
+        <div class="table-scroll">
+          <table><thead><tr><th>Session</th><th>เวลา (ICT)</th><th>Trades</th><th>Win</th><th>Loss</th><th>Win Rate</th><th>Net P&L</th><th>Avg P&L</th><th>Best</th><th>Worst</th></tr></thead>
+          <tbody id="sessionTableBody"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- RISK MANAGEMENT -->
+    <div class="page" id="page-risk">
+      <!-- Settings card -->
+      <div class="form-card" style="margin-bottom:14px">
+        <div class="form-title">⚙ ตั้งค่า Risk</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>💰 Account Balance ($)</label>
+            <input type="number" id="rm_balance" placeholder="เช่น 10000" oninput="renderRisk()">
+          </div>
+          <div class="form-group">
+            <label>⚠ Max Risk per Trade (%)</label>
+            <input type="number" id="rm_risk_pct" placeholder="เช่น 1" step="0.1" oninput="renderRisk()">
+          </div>
+          <div class="form-group">
+            <label>🛑 Max Daily Loss ($)</label>
+            <input type="number" id="rm_daily_loss" placeholder="เช่น 100" oninput="renderRisk()">
+          </div>
+          <div class="form-group">
+            <label>🎯 Daily Profit Target ($)</label>
+            <input type="number" id="rm_daily_target" placeholder="เช่น 200" oninput="renderRisk()">
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-primary" onclick="saveRiskSettings()">💾 บันทึก</button>
+        </div>
+      </div>
+      <!-- Risk Stats -->
+      <div class="stats-grid" id="riskStats"></div>
+      <!-- Daily Risk Monitor -->
+      <div class="charts-grid" style="grid-template-columns:1fr 1fr;margin-bottom:12px">
+        <div class="chart-card">
+          <div class="chart-title">📅 Daily P&L vs Limits</div>
+          <canvas id="dailyRiskChart" style="max-height:200px"></canvas>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">🎯 % Risk per Trade</div>
+          <canvas id="riskPctChart" style="max-height:200px"></canvas>
+        </div>
+      </div>
+      <!-- Rule violations table -->
+      <div class="table-wrap">
+        <div class="table-header"><span class="table-title">⚠ วันที่ละเมิด Rule</span></div>
+        <div class="table-scroll">
+          <table><thead><tr><th>Date</th><th>Daily P&L</th><th>Max Loss Limit</th><th>Status</th><th>Trades</th></tr></thead>
+          <tbody id="riskViolationBody"></tbody></table>
         </div>
       </div>
     </div>
@@ -703,9 +872,14 @@ function switchPage(id, btn){
   if(id==='dashboard') renderDashboard();
   if(id==='tradelog') renderTable();
   if(id==='insights') renderInsights();
+  if(id==='session') renderSessionPage();
+  if(id==='risk'){ loadRiskSettings(); renderRisk(); }
   if(id==='mistakes') renderMistakePage();
   if(id==='report') renderReport();
-  if(id==='addtrade'){ clearForm(); }
+  if(id==='addtrade'){ clearForm(); checkDailyLossAlert();
+    const lim = localStorage.getItem('tj_daylimit');
+    if(lim) document.getElementById('ps_daylimit').value = lim;
+  }
 }
 
 // ============================================================
@@ -906,21 +1080,177 @@ function setSide(s,btn){
   currentSide=s;
   document.querySelectorAll('.side-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
+  liveCalc();
 }
 
-function clearForm(){
+function liveCalc(){
+  const lot    = parseFloat(document.getElementById('f_lot').value)   || 0;
+  const entry  = parseFloat(document.getElementById('f_entry').value) || 0;
+  const exit   = parseFloat(document.getElementById('f_exit').value)  || 0;
+  const sl     = parseFloat(document.getElementById('f_sl').value)    || 0;
+  const tp     = parseFloat(document.getElementById('f_tp').value)    || 0;
+  const res    = document.getElementById('calcResult');
+
+  // Need at least entry + lot to show anything
+  if(!entry || !lot){ res.style.display='none'; return; }
+
+  // P&L (if exit filled)
+  let pnl = null, pips = null;
+  if(exit){
+    const diff = currentSide==='BUY' ? (exit-entry) : (entry-exit);
+    pips = Math.round(diff * 10) / 10;
+    pnl  = Math.round(diff * lot * 100) / 100;
+    // Auto-fill P&L field
+    document.getElementById('f_pnl').value = pnl;
+  }
+
+  // Risk / Reward
+  const riskPips   = sl     ? Math.abs(entry - sl) : null;
+  const rewardPips = tp     ? Math.abs(tp - entry)  : null;
+  const riskDollar   = riskPips   ? Math.round(riskPips   * lot * 100) / 100 : null;
+  const rewardDollar = rewardPips ? Math.round(rewardPips * lot * 100) / 100 : null;
+  const rr = (riskPips && rewardPips) ? Math.round(rewardPips / riskPips * 100) / 100 : null;
+
+  // New balance
+  const lastBal = trades.length > 0 ? trades[trades.length-1].balance : 100;
+  const newBal  = pnl !== null ? Math.round((lastBal + pnl) * 100) / 100 : null;
+
+  // Update UI
+  res.style.display = 'flex';
+
+  const pnlEl = document.getElementById('rc_pnl');
+  if(pnl !== null){
+    pnlEl.textContent = (pnl >= 0 ? '+' : '') + '$' + pnl;
+    pnlEl.style.color = pnl >= 0 ? 'var(--accent)' : 'var(--red)';
+  } else {
+    pnlEl.textContent = '—'; pnlEl.style.color = 'var(--muted)';
+  }
+
+  document.getElementById('rc_rr').textContent     = rr           ? rr+'R'              : '—';
+  document.getElementById('rc_risk').textContent   = riskDollar   ? '-$'+riskDollar     : '—';
+  document.getElementById('rc_reward').textContent = rewardDollar ? '+$'+rewardDollar   : '—';
+  document.getElementById('rc_pips').textContent   = pips !== null ? (pips>=0?'+':'')+pips : '—';
+  document.getElementById('rc_bal').textContent    = newBal !== null ? '$'+newBal       : '—';
+}
+
+// ============================================================
+//  POSITION SIZE CALCULATOR
+// ============================================================
+function calcPositionSize(){
+  const bal      = parseFloat(document.getElementById('ps_balance').value) || 0;
+  const riskPct  = parseFloat(document.getElementById('ps_risk_pct').value) || 1;
+  const entry    = parseFloat(document.getElementById('ps_entry').value) || 0;
+  const sl       = parseFloat(document.getElementById('ps_sl').value) || 0;
+  const res      = document.getElementById('psResult');
+  if(!bal || !entry || !sl){ res.style.display='none'; return; }
+
+  const riskDollar  = Math.round(bal * riskPct / 100 * 100) / 100;
+  const slPips      = Math.abs(entry - sl);
+  if(!slPips){ res.style.display='none'; return; }
+
+  // Lot size: risk$ / slPips  (1 lot = 1 pip = $1 for Metals/Index, adjust if needed)
+  const lot         = Math.floor(riskDollar / slPips * 100) / 100;
+  const pipValue    = Math.round(lot * 100) / 100;
+
+  res.style.display = 'block';
+  document.getElementById('ps_lot_result').textContent  = lot > 0 ? lot.toFixed(2) : '0.01';
+  document.getElementById('ps_risk_dollar').textContent = '-$' + riskDollar;
+  document.getElementById('ps_sl_pips').textContent     = slPips.toFixed(1) + ' pts';
+  document.getElementById('ps_pip_val').textContent     = '$' + pipValue + '/pip';
+}
+
+function applyPositionSize(){
+  const lot = document.getElementById('ps_lot_result').textContent;
+  const entry = document.getElementById('ps_entry').value;
+  const sl = document.getElementById('ps_sl').value;
+  if(lot && lot !== '—'){
+    document.getElementById('f_lot').value   = parseFloat(lot) || '';
+    if(entry) document.getElementById('f_entry').value = entry;
+    if(sl)    document.getElementById('f_sl').value    = sl;
+    liveCalc();
+    showToast('ใช้ค่า Lot ' + lot + ' แล้ว','success');
+  }
+}
+
+function saveDayLimit(){
+  const v = document.getElementById('ps_daylimit').value;
+  if(v) localStorage.setItem('tj_daylimit', v);
+  checkDailyLossAlert();
+}
+
+function checkDailyLossAlert(){
+  const limit = parseFloat(localStorage.getItem('tj_daylimit')) || 0;
+  if(!limit) return;
+  const today = new Date().toISOString().slice(0,10);
+  const todayPnL = trades.filter(t=>t.date===today).reduce((a,t)=>a+t.pnl,0);
+  const alertEl = document.getElementById('dailyLossAlert');
+  if(todayPnL < 0 && Math.abs(todayPnL) >= limit){
+    alertEl.style.display = 'flex';
+    document.getElementById('dailyLossMsg').textContent =
+      `🔴 Daily Loss -$${Math.abs(todayPnL)} เกิน Limit $${limit} — แนะนำหยุดเทรดวันนี้`;
+  } else {
+    alertEl.style.display = 'none';
+  }
+}
   editingId=null;
   currentSide='';
   document.getElementById('formTitle').textContent='+ เพิ่ม Trade ใหม่';
   document.getElementById('saveBtn').textContent='Add Trade';
+
+  // Auto-fill date & start time = now
+  const now = new Date();
+  const today = now.toISOString().split('T')[0];
+  const timeNow = now.toTimeString().slice(0,5);
+  document.getElementById('f_date').value = today;
+  document.getElementById('f_start').value = timeNow;
+
+  // Clear price & result fields
+  ['f_end','f_entry','f_exit','f_sl','f_tp','f_pnl','f_notes'].forEach(id=>{
+    document.getElementById(id).value='';
+  });
+
+  // Pre-fill from last trade: lot, trend, zone, confirm, emotion, side
+  const last = trades.length > 0 ? trades[trades.length-1] : null;
+  if(last){
+    document.getElementById('f_lot').value = last.lot || '';
+    document.getElementById('f_trend').value = last.trend || '';
+    document.getElementById('f_zone').value = last.zone || '';
+    document.getElementById('f_confirm').value = last.confirm || '✅';
+    document.getElementById('f_emotion').value = last.emotion || '😊';
+    document.getElementById('f_mistake').value = '';
+    // pre-select side
+    currentSide = last.side || '';
+    document.querySelectorAll('.side-btn').forEach(b=>{
+      b.classList.toggle('active', b.textContent === currentSide);
+    });
+  } else {
+    document.getElementById('f_lot').value = '';
+    document.getElementById('f_confirm').value = '✅';
+    document.getElementById('f_emotion').value = '😊';
+    document.getElementById('f_mistake').value = '';
+    document.querySelectorAll('.side-btn').forEach(b=>b.classList.remove('active'));
+  }
+
+  // Show hint about pre-filled values
+  if(last){
+    const hint = document.getElementById('formHint');
+    if(hint) hint.textContent = `↩ จำค่าจาก Trade #${last.id} — lot:${last.lot}, zone:${last.zone||'-'}, trend:${last.trend||'-'}`;
+  }
+}
+
+function resetFormBlank(){
+  editingId=null; currentSide='';
+  document.getElementById('formTitle').textContent='+ เพิ่ม Trade ใหม่';
+  document.getElementById('saveBtn').textContent='Add Trade';
+  document.getElementById('formHint').textContent='';
   const today = new Date().toISOString().split('T')[0];
+  const timeNow = new Date().toTimeString().slice(0,5);
   document.getElementById('f_date').value=today;
-  ['f_start','f_end','f_lot','f_entry','f_exit','f_sl','f_tp','f_pnl','f_notes'].forEach(id=>{document.getElementById(id).value='';});
+  document.getElementById('f_start').value=timeNow;
+  ['f_end','f_lot','f_entry','f_exit','f_sl','f_tp','f_pnl','f_notes'].forEach(id=>{document.getElementById(id).value='';});
   ['f_trend','f_zone','f_confirm','f_emotion','f_mistake'].forEach(id=>{document.getElementById(id).selectedIndex=0;});
   document.querySelectorAll('.side-btn').forEach(b=>b.classList.remove('active'));
 }
-
-function editTrade(id){
   const t = trades.find(t=>t.id===id);
   if(!t)return;
   editingId=id;
@@ -991,6 +1321,7 @@ function saveTrade(){
     side:currentSide, lot, entry, exit, sl, tp, pnl, balance, rr,
     trend:document.getElementById('f_trend').value,
     zone:document.getElementById('f_zone').value,
+    session:document.getElementById('f_session').value || detectSession(document.getElementById('f_start').value),
     confirm:document.getElementById('f_confirm').value,
     emotion:document.getElementById('f_emotion').value,
     mistake:document.getElementById('f_mistake').value,
@@ -1341,6 +1672,243 @@ function exportReport(){
   const a = document.createElement('a'); a.href=url; a.download=`tj_report_${period}.txt`; a.click();
   URL.revokeObjectURL(url);
   showToast('Export Report สำเร็จ','success');
+}
+
+// ============================================================
+//  SESSION ANALYSIS
+// ============================================================
+// ICT Sessions in UTC+7 (Thailand time)
+const SESSIONS = {
+  'Asian':    { start: 2,  end: 9,  color: 'rgba(96,165,250,.7)',  bg: 'rgba(96,165,250,.12)'  },
+  'London':   { start: 14, end: 21, color: 'rgba(251,191,36,.7)',  bg: 'rgba(251,191,36,.12)'  },
+  'New York':  { start: 19, end: 24, color: 'rgba(74,222,128,.7)', bg: 'rgba(74,222,128,.12)'  },
+  'London/NY': { start: 19, end: 21, color: 'rgba(167,139,250,.7)',bg: 'rgba(167,139,250,.12)' },
+  'Off':      { start: 0,  end: 2,  color: 'rgba(107,117,146,.5)', bg: 'rgba(107,117,146,.08)' },
+};
+
+function detectSession(timeStr){
+  if(!timeStr) return 'Off';
+  const [h] = timeStr.split(':').map(Number);
+  if(h >= 2  && h < 9)  return 'Asian';
+  if(h >= 19 && h < 21) return 'London/NY';
+  if(h >= 14 && h < 21) return 'London';
+  if(h >= 19 && h < 24) return 'New York';
+  return 'Off';
+}
+
+function getSession(t){
+  return t.session || detectSession(t.start);
+}
+
+function renderSessionPage(){
+  // Build session map
+  const sm = {};
+  Object.keys(SESSIONS).forEach(s=>{ sm[s]={trades:[],wins:0,pnl:0}; });
+  trades.forEach(t=>{
+    const s = getSession(t);
+    if(!sm[s]) sm[s]={trades:[],wins:0,pnl:0};
+    sm[s].trades.push(t);
+    if(t.pnl>0) sm[s].wins++;
+    sm[s].pnl += t.pnl;
+  });
+  const active = Object.entries(sm).filter(([,v])=>v.trades.length>0);
+
+  // Stat cards
+  document.getElementById('sessionStats').innerHTML = active.map(([s,v])=>{
+    const wr = v.trades.length>0?(v.wins/v.trades.length*100).toFixed(0):0;
+    const col = SESSIONS[s]?.color || 'rgba(107,117,146,.7)';
+    return `<div class="stat-card" style="border-top:2px solid ${col.replace('.7','1')}">
+      <div class="stat-label">${s}</div>
+      <div class="stat-value ${v.pnl>=0?'green':'red'}">${v.pnl>=0?'+':''}$${v.pnl}</div>
+      <div class="stat-sub">WR ${wr}% · ${v.trades.length} trades</div>
+    </div>`;
+  }).join('');
+
+  // Charts
+  const labels = active.map(([s])=>s);
+  const pnls   = active.map(([,v])=>v.pnl);
+  const wrs    = active.map(([,v])=>v.trades.length>0?+(v.wins/v.trades.length*100).toFixed(1):0);
+  const counts = active.map(([,v])=>v.trades.length);
+  const bgColors = active.map(([s])=>SESSIONS[s]?.color||'rgba(107,117,146,.5)');
+
+  destroyChart('sessionPnl');
+  destroyChart('sessionWr');
+  destroyChart('sessionCount');
+
+  chartInstances['sessionPnl'] = new Chart(
+    document.getElementById('sessionPnlChart').getContext('2d'),{
+      type:'bar',
+      data:{labels,datasets:[{data:pnls,backgroundColor:bgColors,borderRadius:6}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+        scales:{x:{ticks:{color:'#6b7592'}},y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#6b7592',callback:v=>'$'+v}}}}
+    });
+
+  chartInstances['sessionWr'] = new Chart(
+    document.getElementById('sessionWrChart').getContext('2d'),{
+      type:'bar',
+      data:{labels,datasets:[{data:wrs,backgroundColor:bgColors,borderRadius:6}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+        scales:{x:{ticks:{color:'#6b7592'}},y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#6b7592',callback:v=>v+'%'},max:100}}}
+    });
+
+  chartInstances['sessionCount'] = new Chart(
+    document.getElementById('sessionCountChart').getContext('2d'),{
+      type:'doughnut',
+      data:{labels,datasets:[{data:counts,backgroundColor:bgColors,borderWidth:0}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:'#6b7592',font:{size:11},boxWidth:10}}},cutout:'55%'}
+    });
+
+  // Hourly P&L heatmap
+  const hourly = Array(24).fill(0);
+  const hourlyCount = Array(24).fill(0);
+  trades.forEach(t=>{
+    if(t.start){ const h=parseInt(t.start.split(':')[0]); hourly[h]+=t.pnl; hourlyCount[h]++; }
+  });
+  const maxAbs = Math.max(...hourly.map(Math.abs),1);
+  document.getElementById('hourlyHeatmap').innerHTML =
+    `<div style="display:grid;grid-template-columns:repeat(12,1fr);gap:3px;margin-top:4px">
+      ${Array.from({length:24},(_,h)=>{
+        const v=hourly[h]; const c=hourlyCount[h];
+        const alpha=c>0?(0.2+Math.abs(v)/maxAbs*.7):0.06;
+        const col=v>0?`rgba(74,222,128,${alpha})`:v<0?`rgba(248,113,113,${alpha})`:`rgba(107,117,146,${alpha})`;
+        return `<div title="${h}:00 — P&L: $${v} (${c} trades)" style="background:${col};border-radius:4px;padding:5px 2px;text-align:center">
+          <div style="font-size:9px;color:#fff;opacity:.6">${h}</div>
+          ${c>0?`<div style="font-size:9px;font-family:var(--mono);color:#fff">${v>0?'+':''}${v}</div>`:''}
+        </div>`;
+      }).join('')}
+    </div><div style="font-size:10px;color:var(--muted);margin-top:6px">เวลา ICT (UTC+7) · Asian 02-09 · London 14-21 · NY 19-24</div>`;
+
+  // Session table
+  document.getElementById('sessionTableBody').innerHTML = active.map(([s,v])=>{
+    const wr = v.trades.length>0?(v.wins/v.trades.length*100).toFixed(0):0;
+    const avg = v.trades.length>0?(v.pnl/v.trades.length).toFixed(2):0;
+    const best = v.trades.length>0?Math.max(...v.trades.map(t=>t.pnl)):0;
+    const worst = v.trades.length>0?Math.min(...v.trades.map(t=>t.pnl)):0;
+    const times = {Asian:'02:00–09:00',London:'14:00–21:00','New York':'19:00–24:00','London/NY':'19:00–21:00',Off:'อื่นๆ'};
+    return `<tr>
+      <td><span style="background:${SESSIONS[s]?.bg||'rgba(107,117,146,.1)'};color:#fff;padding:3px 10px;border-radius:5px;font-size:12px;font-weight:600">${s}</span></td>
+      <td class="mono" style="font-size:11px;color:var(--muted)">${times[s]||''}</td>
+      <td class="mono">${v.trades.length}</td>
+      <td class="mono" style="color:var(--accent)">${v.wins}</td>
+      <td class="mono" style="color:var(--red)">${v.trades.length-v.wins}</td>
+      <td><span class="${wr>=50?'pnl-pos':'pnl-neg'}">${wr}%</span></td>
+      <td><span class="${v.pnl>=0?'pnl-pos':'pnl-neg'}">${v.pnl>=0?'+':''}$${v.pnl}</span></td>
+      <td class="mono ${avg>=0?'pnl-pos':'pnl-neg'}">${avg>=0?'+':''}$${avg}</td>
+      <td class="mono pnl-pos">+$${best}</td>
+      <td class="mono pnl-neg">$${worst}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ============================================================
+//  RISK MANAGEMENT
+// ============================================================
+const RISK_KEY = 'tj_risk_settings';
+let riskSettings = { balance:10000, riskPct:1, dailyLoss:100, dailyTarget:200 };
+
+function loadRiskSettings(){
+  try{
+    const s = JSON.parse(localStorage.getItem(RISK_KEY)||'{}');
+    riskSettings = { ...riskSettings, ...s };
+  }catch(e){}
+  document.getElementById('rm_balance').value    = riskSettings.balance;
+  document.getElementById('rm_risk_pct').value   = riskSettings.riskPct;
+  document.getElementById('rm_daily_loss').value = riskSettings.dailyLoss;
+  document.getElementById('rm_daily_target').value = riskSettings.dailyTarget;
+}
+
+function saveRiskSettings(){
+  riskSettings.balance     = parseFloat(document.getElementById('rm_balance').value)||10000;
+  riskSettings.riskPct     = parseFloat(document.getElementById('rm_risk_pct').value)||1;
+  riskSettings.dailyLoss   = parseFloat(document.getElementById('rm_daily_loss').value)||100;
+  riskSettings.dailyTarget = parseFloat(document.getElementById('rm_daily_target').value)||200;
+  localStorage.setItem(RISK_KEY, JSON.stringify(riskSettings));
+  renderRisk();
+  showToast('บันทึก Risk settings แล้ว','success');
+}
+
+function renderRisk(){
+  const bal     = parseFloat(document.getElementById('rm_balance')?.value)||riskSettings.balance;
+  const riskPct = parseFloat(document.getElementById('rm_risk_pct')?.value)||riskSettings.riskPct;
+  const maxDL   = parseFloat(document.getElementById('rm_daily_loss')?.value)||riskSettings.dailyLoss;
+  const target  = parseFloat(document.getElementById('rm_daily_target')?.value)||riskSettings.dailyTarget;
+  const maxRisk = (bal * riskPct / 100);
+
+  // Per-trade risk %
+  const tradeRisks = trades.map(t=>({ id:t.id, date:t.date, risk: Math.abs(t.pnl), riskPct: bal>0?(Math.abs(t.pnl)/bal*100):0, pnl:t.pnl }));
+  const overRisk = tradeRisks.filter(t=>t.risk>maxRisk);
+  const avgRiskPct = tradeRisks.length>0?(tradeRisks.reduce((a,t)=>a+t.riskPct,0)/tradeRisks.length).toFixed(2):0;
+
+  // Daily P&L
+  const byDay = {};
+  trades.forEach(t=>{ byDay[t.date]=(byDay[t.date]||0)+t.pnl; });
+  const dayEntries = Object.entries(byDay).sort((a,b)=>a[0].localeCompare(b[0]));
+  const violations = dayEntries.filter(([,v])=>v < -maxDL);
+  const hitTarget  = dayEntries.filter(([,v])=>v >= target);
+
+  // Stat cards
+  document.getElementById('riskStats').innerHTML = `
+    <div class="stat-card blue"><div class="stat-label">Max Risk/Trade</div><div class="stat-value blue">$${maxRisk.toFixed(0)}</div><div class="stat-sub">${riskPct}% of $${bal.toLocaleString()}</div></div>
+    <div class="stat-card yellow"><div class="stat-label">Avg Risk Used</div><div class="stat-value yellow">${avgRiskPct}%</div><div class="stat-sub">per trade</div></div>
+    <div class="stat-card red"><div class="stat-label">Over-Risk Trades</div><div class="stat-value red">${overRisk.length}</div><div class="stat-sub">เกิน $${maxRisk.toFixed(0)}</div></div>
+    <div class="stat-card red"><div class="stat-label">Daily Loss Violations</div><div class="stat-value red">${violations.length} วัน</div><div class="stat-sub">เกิน -$${maxDL}</div></div>
+    <div class="stat-card green"><div class="stat-label">Hit Daily Target</div><div class="stat-value green">${hitTarget.length} วัน</div><div class="stat-sub">≥ $${target}</div></div>
+  `;
+
+  // Daily risk chart
+  destroyChart('dailyRisk');
+  destroyChart('riskPct');
+
+  if(dayEntries.length){
+    const ctx = document.getElementById('dailyRiskChart').getContext('2d');
+    chartInstances['dailyRisk'] = new Chart(ctx,{
+      type:'bar',
+      data:{
+        labels: dayEntries.map(([d])=>d.slice(5)),
+        datasets:[
+          { label:'Daily P&L', data:dayEntries.map(([,v])=>v),
+            backgroundColor:dayEntries.map(([,v])=>v>=0?'rgba(74,222,128,.6)':'rgba(248,113,113,.6)'), borderRadius:4 },
+          { label:'Max Loss Limit', data:dayEntries.map(()=>-maxDL),
+            type:'line', borderColor:'rgba(248,113,113,.5)', borderDash:[4,4], pointRadius:0, fill:false },
+          { label:'Daily Target', data:dayEntries.map(()=>target),
+            type:'line', borderColor:'rgba(74,222,128,.4)', borderDash:[4,4], pointRadius:0, fill:false },
+        ]
+      },
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{labels:{color:'#6b7592',font:{size:11},boxWidth:10}}},
+        scales:{x:{ticks:{color:'#6b7592',font:{size:10}}},y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#6b7592',callback:v=>'$'+v}}}}
+    });
+  }
+
+  if(tradeRisks.length){
+    const ctx2 = document.getElementById('riskPctChart').getContext('2d');
+    chartInstances['riskPct'] = new Chart(ctx2,{
+      type:'line',
+      data:{
+        labels:tradeRisks.map(t=>'#'+t.id),
+        datasets:[
+          { label:'Risk %', data:tradeRisks.map(t=>+t.riskPct.toFixed(2)),
+            borderColor:'rgba(251,191,36,.8)', backgroundColor:'rgba(251,191,36,.08)', fill:true, tension:.3, pointRadius:2 },
+          { label:'Max Risk %', data:tradeRisks.map(()=>riskPct),
+            borderColor:'rgba(248,113,113,.5)', borderDash:[4,4], pointRadius:0, fill:false },
+        ]
+      },
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{labels:{color:'#6b7592',font:{size:11},boxWidth:10}}},
+        scales:{x:{display:false},y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#6b7592',callback:v=>v+'%'}}}}
+    });
+  }
+
+  // Violations table
+  document.getElementById('riskViolationBody').innerHTML = violations.length
+    ? violations.map(([d,v])=>`<tr>
+        <td class="mono">${d}</td>
+        <td><span class="pnl-neg">$${v}</span></td>
+        <td class="mono" style="color:var(--muted)">-$${maxDL}</td>
+        <td><span style="background:rgba(248,113,113,.12);color:var(--red);padding:2px 8px;border-radius:4px;font-size:11px">❌ เกิน Max Daily Loss</span></td>
+        <td class="mono">${(byDay[d]!==undefined?trades.filter(t=>t.date===d).length:0)}</td>
+      </tr>`).join('')
+    : `<tr><td colspan="5" style="text-align:center;color:var(--accent);padding:30px">✅ ไม่มีการละเมิด Rule</td></tr>`;
 }
 
 // ============================================================
