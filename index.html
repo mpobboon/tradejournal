@@ -182,6 +182,19 @@ textarea{resize:vertical;min-height:64px}
 .import-drop:hover,.import-drop.drag{border-color:var(--accent);background:rgba(74,222,128,.04)}
 .import-drop p{color:var(--muted);font-size:13px;margin-top:8px}
 
+/* Gist sync */
+.sync-bar{display:flex;align-items:center;gap:8px;padding:6px 12px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:12px;color:var(--muted);flex-wrap:wrap}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:var(--muted);flex-shrink:0;transition:background .3s}
+.sync-dot.ok{background:var(--accent)}
+.sync-dot.err{background:var(--red)}
+.sync-dot.loading{background:var(--yellow);animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.sync-status{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sync-token-wrap{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.sync-input{background:var(--surface);border:1px solid var(--border);border-radius:5px;color:var(--text);font-family:var(--mono);font-size:11px;padding:4px 8px;outline:none;width:200px}
+.sync-input:focus{border-color:var(--accent)}
+@media(max-width:480px){.sync-input{width:130px}}
+
 /* Notification */
 .toast{position:fixed;bottom:20px;right:20px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 16px;font-size:13px;z-index:300;transition:all .3s;transform:translateY(80px);opacity:0;max-width:300px}
 .toast.show{transform:translateY(0);opacity:1}
@@ -222,6 +235,19 @@ textarea{resize:vertical;min-height:64px}
       <input type="file" id="importFile" accept=".json,.csv,.xlsx" style="display:none" onchange="importData(this)">
     </div>
   </header>
+
+  <!-- GIST SYNC BAR -->
+  <div class="sync-bar" id="syncBar">
+    <div class="sync-dot" id="syncDot"></div>
+    <span class="sync-status" id="syncStatus">ยังไม่ได้ตั้งค่า GitHub Gist</span>
+    <div class="sync-token-wrap">
+      <input class="sync-input" id="gistToken" type="password" placeholder="GitHub Token (ghp_...)" title="Personal Access Token with gist scope">
+      <input class="sync-input" id="gistId" type="text" placeholder="Gist ID (ว่างไว้=สร้างใหม่)" style="width:160px">
+      <button class="btn btn-ghost btn-sm" onclick="saveGistConfig()">💾 บันทึก</button>
+      <button class="btn btn-ghost btn-sm" onclick="syncFromGist()">⟳ Pull</button>
+      <button class="btn btn-ghost btn-sm" onclick="syncToGist()">↑ Push</button>
+    </div>
+  </div>
 
   <main class="main">
     <!-- DASHBOARD -->
@@ -430,10 +456,93 @@ textarea{resize:vertical;min-height:64px}
 //  DATA LAYER
 // ============================================================
 const STORAGE_KEY = 'tj_trades_v1';
+const GIST_CONFIG_KEY = 'tj_gist_config';
+const GIST_FILENAME = 'trading_journal_data.json';
 let trades = [];
 let editingId = null;
 let deleteId = null;
 let currentSide = '';
+
+// ============================================================
+//  GITHUB GIST SYNC
+// ============================================================
+let gistConfig = { token: '', gistId: '' };
+
+function loadGistConfig(){
+  try{
+    const c = JSON.parse(localStorage.getItem(GIST_CONFIG_KEY)||'{}');
+    gistConfig = { token: c.token||'', gistId: c.gistId||'' };
+    if(gistConfig.token) document.getElementById('gistToken').value = gistConfig.token;
+    if(gistConfig.gistId) document.getElementById('gistId').value = gistConfig.gistId;
+    updateSyncUI(gistConfig.token ? 'ready' : 'none', gistConfig.token ? 'พร้อม Sync — Gist: '+(gistConfig.gistId||'จะสร้างใหม่') : 'ยังไม่ได้ตั้งค่า GitHub Gist');
+  }catch(e){}
+}
+
+function saveGistConfig(){
+  gistConfig.token = document.getElementById('gistToken').value.trim();
+  gistConfig.gistId = document.getElementById('gistId').value.trim();
+  if(!gistConfig.token){ showToast('กรุณากรอก GitHub Token','error'); return; }
+  localStorage.setItem(GIST_CONFIG_KEY, JSON.stringify(gistConfig));
+  updateSyncUI('ready','บันทึกการตั้งค่าแล้ว — กด Push เพื่ออัปโหลดข้อมูล');
+  showToast('บันทึก Gist config แล้ว','success');
+}
+
+function updateSyncUI(state, msg){
+  const dot = document.getElementById('syncDot');
+  const status = document.getElementById('syncStatus');
+  dot.className = 'sync-dot' + (state==='ok'?' ok':state==='err'?' err':state==='loading'?' loading':'');
+  status.textContent = msg;
+}
+
+async function syncToGist(){
+  if(!gistConfig.token){ showToast('กรุณาตั้งค่า Token ก่อน','error'); return; }
+  updateSyncUI('loading','กำลัง Push ข้อมูลขึ้น Gist...');
+  try{
+    const body = { description:'Trading Journal Data', public:false,
+      files:{ [GIST_FILENAME]:{ content: JSON.stringify(trades, null, 2) } } };
+    let url = 'https://api.github.com/gists';
+    let method = 'POST';
+    if(gistConfig.gistId){ url += '/'+gistConfig.gistId; method='PATCH'; }
+    const res = await fetch(url,{ method, headers:{ 'Authorization':'token '+gistConfig.token, 'Content-Type':'application/json' }, body:JSON.stringify(body) });
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    if(!gistConfig.gistId){
+      gistConfig.gistId = data.id;
+      document.getElementById('gistId').value = data.id;
+      localStorage.setItem(GIST_CONFIG_KEY, JSON.stringify(gistConfig));
+    }
+    const now = new Date().toLocaleTimeString('th-TH');
+    updateSyncUI('ok','✓ Push สำเร็จ เวลา '+now+' — Gist: '+gistConfig.gistId);
+    showToast('Push ข้อมูลสำเร็จ ('+trades.length+' trades)','success');
+  }catch(e){
+    updateSyncUI('err','Push ล้มเหลว: '+e.message);
+    showToast('Push ล้มเหลว: '+e.message,'error');
+  }
+}
+
+async function syncFromGist(){
+  if(!gistConfig.token){ showToast('กรุณาตั้งค่า Token ก่อน','error'); return; }
+  if(!gistConfig.gistId){ showToast('กรุณากรอก Gist ID ก่อน','error'); return; }
+  updateSyncUI('loading','กำลัง Pull ข้อมูลจาก Gist...');
+  try{
+    const res = await fetch('https://api.github.com/gists/'+gistConfig.gistId, { headers:{ 'Authorization':'token '+gistConfig.token } });
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    const file = data.files[GIST_FILENAME];
+    if(!file) throw new Error('ไม่พบไฟล์ '+GIST_FILENAME+' ใน Gist');
+    const pulled = JSON.parse(file.content);
+    if(!Array.isArray(pulled)) throw new Error('รูปแบบข้อมูลไม่ถูกต้อง');
+    trades = pulled;
+    saveTrades();
+    renderDashboard();
+    const now = new Date().toLocaleTimeString('th-TH');
+    updateSyncUI('ok','✓ Pull สำเร็จ เวลา '+now+' ('+trades.length+' trades)');
+    showToast('Pull ข้อมูลสำเร็จ ('+trades.length+' trades)','success');
+  }catch(e){
+    updateSyncUI('err','Pull ล้มเหลว: '+e.message);
+    showToast('Pull ล้มเหลว: '+e.message,'error');
+  }
+}
 
 // Pre-loaded sample data from Excel
 const SAMPLE_TRADES = [
@@ -936,6 +1045,7 @@ function showToast(msg, type='success'){
 //  INIT
 // ============================================================
 loadTrades();
+loadGistConfig();
 renderDashboard();
 </script>
 </body>
