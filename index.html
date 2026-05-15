@@ -250,13 +250,13 @@ textarea{resize:vertical;min-height:64px}
       <button class="nav-btn" onclick="switchPage('addtrade',this)">+ Add Trade</button>
       <button class="nav-btn" onclick="switchPage('insights',this)">Insights</button>
       <button class="nav-btn" onclick="switchPage('mistakes',this)">⚠ Mistakes</button>
-      <button class="nav-btn" onclick="switchPage('session',this)">⏰ Session</button>
       <button class="nav-btn" onclick="switchPage('report',this)">📋 Report</button>
     </nav>
     <div class="header-right">
       <button class="btn btn-ghost btn-sm" onclick="exportCSV()">↓ CSV</button>
       <button class="btn btn-ghost btn-sm" onclick="document.getElementById('importFile').click()">↑ Import</button>
       <input type="file" id="importFile" accept=".json,.csv,.xlsx" style="display:none" onchange="importData(this)">
+      <button class="btn btn-danger btn-sm" onclick="openClearAllModal()">🗑 Clear All</button>
     </div>
   </header>
 
@@ -490,38 +490,6 @@ textarea{resize:vertical;min-height:64px}
       </div>
     </div>
 
-    <!-- SESSION ANALYSIS -->
-    <div class="page" id="page-session">
-      <div class="stats-grid" id="sessionStats"></div>
-      <div class="charts-grid" style="grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
-        <div class="chart-card">
-          <div class="chart-title">📊 Net P&L by Session</div>
-          <canvas id="sessionPnlChart" style="max-height:180px"></canvas>
-        </div>
-        <div class="chart-card">
-          <div class="chart-title">🎯 Win Rate by Session</div>
-          <canvas id="sessionWrChart" style="max-height:180px"></canvas>
-        </div>
-      </div>
-      <div class="charts-grid" style="grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
-        <div class="chart-card">
-          <div class="chart-title">📈 สัดส่วน Trades</div>
-          <canvas id="sessionCountChart" style="max-height:160px"></canvas>
-        </div>
-        <div class="chart-card">
-          <div class="chart-title">⏰ Hourly P&L (ทุก ชม.)</div>
-          <div id="hourlyHeatmap"></div>
-        </div>
-      </div>
-      <div class="table-wrap">
-        <div class="table-header"><span class="table-title">Session Breakdown</span></div>
-        <div class="table-scroll">
-          <table><thead><tr><th>Session</th><th>Trades</th><th>W / L</th><th>Win Rate</th><th>Net P&L</th><th>Avg P&L</th><th>Avg R:R</th><th>Mistakes</th></tr></thead>
-          <tbody id="sessionTableBody"></tbody></table>
-        </div>
-      </div>
-    </div>
-
     <!-- REPORT -->
     <div class="page" id="page-report">
       <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
@@ -548,6 +516,27 @@ textarea{resize:vertical;min-height:64px}
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal('deleteModal')">ยกเลิก</button>
       <button class="btn btn-danger" onclick="confirmDelete()">ลบ</button>
+    </div>
+  </div>
+</div>
+
+<!-- CLEAR ALL MODAL -->
+<div class="modal-overlay" id="clearAllModal">
+  <div class="modal">
+    <div class="modal-title" style="color:var(--red)">🗑 ลบข้อมูลทั้งหมด</div>
+    <p style="color:var(--muted);font-size:13px;line-height:1.7">
+      คุณกำลังจะลบ <span id="clearAllCount" style="color:var(--text);font-weight:600"></span> trades ออกทั้งหมด<br>
+      <span style="color:var(--red);font-size:12px">⚠ ไม่สามารถกู้คืนได้ — แนะนำ Export CSV ก่อนลบ</span>
+    </p>
+    <div style="margin-top:14px;display:flex;gap:8px">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--muted);text-transform:none;letter-spacing:0">
+        <input type="checkbox" id="clearAllConfirmCheck" onchange="document.getElementById('clearAllConfirmBtn').disabled=!this.checked" style="width:14px;height:14px;accent-color:var(--red)">
+        ฉันเข้าใจและต้องการลบข้อมูลทั้งหมด
+      </label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeClearAllModal()">ยกเลิก</button>
+      <button class="btn btn-danger" id="clearAllConfirmBtn" disabled onclick="confirmClearAll()">ลบทั้งหมด</button>
     </div>
   </div>
 </div>
@@ -711,6 +700,24 @@ const SAMPLE_TRADES = [
   {id:26,date:"2026-04-27",start:"16:29",end:"17:04",side:"SELL",lot:0.01,entry:4702,exit:4706,sl:4706,tp:4692,pnl:-4,balance:180,rr:1,trend:"Downtrend",zone:"POI",confirm:"❌",emotion:"😐",mistake:"",notes:""},
 ];
 
+function openClearAllModal(){
+  document.getElementById('clearAllCount').textContent = trades.length;
+  document.getElementById('clearAllConfirmCheck').checked = false;
+  document.getElementById('clearAllConfirmBtn').disabled = true;
+  document.getElementById('clearAllModal').classList.add('show');
+}
+function closeClearAllModal(){
+  document.getElementById('clearAllModal').classList.remove('show');
+}
+function confirmClearAll(){
+  trades = [];
+  localStorage.removeItem(STORAGE_KEY);
+  closeClearAllModal();
+  renderDashboard();
+  renderTable ? renderTable() : null;
+  showToast('ลบข้อมูลทั้งหมดแล้ว','success');
+}
+
 function loadTrades(){
   const saved = localStorage.getItem(STORAGE_KEY);
   if(saved){
@@ -737,7 +744,6 @@ function switchPage(id, btn){
   if(id==='tradelog') renderTable();
   if(id==='insights') renderInsights();
   if(id==='mistakes') renderMistakePage();
-  if(id==='session') renderSessionPage();
   if(id==='report') renderReport();
   if(id==='addtrade'){ clearForm(); }
 }
@@ -1375,112 +1381,6 @@ function exportReport(){
   const a = document.createElement('a'); a.href=url; a.download=`tj_report_${period}.txt`; a.click();
   URL.revokeObjectURL(url);
   showToast('Export Report สำเร็จ','success');
-}
-
-// ============================================================
-//  SESSION ANALYSIS
-// ============================================================
-function detectSession(timeStr){
-  if(!timeStr) return 'Other';
-  const h = parseInt(timeStr.split(':')[0]);
-  if(h >= 7  && h < 14) return 'Tokyo';
-  if(h >= 14 && h < 19) return 'London';
-  if(h >= 19 || h < 4)  return 'New York';
-  return 'Other';
-}
-
-function renderSessionPage(){
-  const SESSIONS = ['Tokyo','London','New York','Other'];
-  const sessionColors = { 'Tokyo':'#f472b6','London':'var(--blue)','New York':'var(--accent)','Other':'var(--muted)' };
-  const sessionBg = { 'Tokyo':'rgba(244,114,182,.65)','London':'rgba(96,165,250,.65)','New York':'rgba(74,222,128,.65)','Other':'rgba(107,117,146,.5)' };
-  const cardClass = { 'Tokyo':'','London':'blue','New York':'green','Other':'' };
-
-  const sd = {};
-  SESSIONS.forEach(s=>{ sd[s]={trades:[],wins:0,pnl:0,rr:0}; });
-  trades.forEach(t=>{
-    const s = detectSession(t.start);
-    const b = sd[s] || sd['Other'];
-    b.trades.push(t); b.pnl+=t.pnl; b.rr+=t.rr;
-    if(t.pnl>0) b.wins++;
-  });
-
-  const sorted = Object.entries(sd).filter(([,v])=>v.trades.length>0).sort((a,b)=>b[1].trades.length-a[1].trades.length);
-
-  // Stat cards
-  document.getElementById('sessionStats').innerHTML = sorted.map(([s,v])=>{
-    const wr = (v.wins/v.trades.length*100).toFixed(0);
-    const avgRR = (v.rr/v.trades.length).toFixed(2);
-    return `<div class="stat-card ${cardClass[s]||''}">
-      <div class="stat-label">${s}</div>
-      <div class="stat-value ${v.pnl>=0?'green':'red'}">${v.pnl>=0?'+':''}$${v.pnl}</div>
-      <div class="stat-sub">${v.trades.length} trades · WR ${wr}% · RR ${avgRR}</div>
-    </div>`;
-  }).join('');
-
-  // P&L bar chart
-  destroyChart('sessionPnl');
-  const ctx1 = document.getElementById('sessionPnlChart').getContext('2d');
-  chartInstances['sessionPnl'] = new Chart(ctx1,{
-    type:'bar',
-    data:{ labels:sorted.map(([s])=>s), datasets:[{ data:sorted.map(([,v])=>v.pnl), backgroundColor:sorted.map(([s,v])=>v.pnl>=0?(sessionBg[s]||'rgba(74,222,128,.6)'):'rgba(248,113,113,.65)'), borderRadius:6, borderSkipped:false }] },
-    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
-      scales:{ x:{ticks:{color:'#6b7592',font:{size:11}}}, y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#6b7592',callback:v=>'$'+v}} } }
-  });
-
-  // Win Rate bar chart
-  destroyChart('sessionWr');
-  const wrs = sorted.map(([,v])=>v.trades.length>0?(v.wins/v.trades.length*100):0);
-  const ctx2 = document.getElementById('sessionWrChart').getContext('2d');
-  chartInstances['sessionWr'] = new Chart(ctx2,{
-    type:'bar',
-    data:{ labels:sorted.map(([s])=>s), datasets:[{ data:wrs, backgroundColor:wrs.map(w=>w>=60?'rgba(74,222,128,.65)':w>=50?'rgba(251,191,36,.65)':'rgba(248,113,113,.65)'), borderRadius:6, borderSkipped:false }] },
-    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
-      scales:{ x:{ticks:{color:'#6b7592',font:{size:11}}}, y:{min:0,max:100,grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#6b7592',callback:v=>v+'%'}} } }
-  });
-
-  // Doughnut
-  destroyChart('sessionCount');
-  const ctx3 = document.getElementById('sessionCountChart').getContext('2d');
-  chartInstances['sessionCount'] = new Chart(ctx3,{
-    type:'doughnut',
-    data:{ labels:sorted.map(([s])=>s), datasets:[{ data:sorted.map(([,v])=>v.trades.length), backgroundColor:sorted.map(([s])=>sessionBg[s]||'rgba(107,117,146,.5)'), borderWidth:0, hoverOffset:4 }] },
-    options:{ responsive:true, maintainAspectRatio:false, cutout:'60%', plugins:{legend:{position:'bottom',labels:{color:'#6b7592',font:{size:11},boxWidth:10,padding:10}}} }
-  });
-
-  // Hourly heatmap
-  const hourly = {};
-  for(let h=0;h<24;h++) hourly[h]={pnl:0,count:0};
-  trades.forEach(t=>{ if(!t.start) return; const h=parseInt(t.start.split(':')[0]); hourly[h].pnl+=t.pnl; hourly[h].count++; });
-  const maxAbs = Math.max(...Object.values(hourly).map(v=>Math.abs(v.pnl)),1);
-  document.getElementById('hourlyHeatmap').innerHTML = `<div style="display:grid;grid-template-columns:repeat(12,1fr);gap:3px;margin-top:4px">
-    ${Array.from({length:24},(_,h)=>{
-      const v=hourly[h];
-      const a = v.count>0?0.2+(Math.abs(v.pnl)/maxAbs)*0.7:0.06;
-      const bg = v.pnl>0?`rgba(74,222,128,${a})`:v.pnl<0?`rgba(248,113,113,${a})`:`rgba(107,117,146,${a})`;
-      return `<div title="${h}:00 — ${v.count} trades P&L $${v.pnl}" style="background:${bg};border-radius:4px;padding:5px 2px;text-align:center">
-        <div style="font-size:9px;color:rgba(255,255,255,.4);font-family:var(--mono)">${String(h).padStart(2,'0')}</div>
-        <div style="font-size:9px;font-family:var(--mono);font-weight:700;color:${v.pnl>0?'var(--accent)':v.pnl<0?'var(--red)':'var(--muted)'}">${v.count>0?(v.pnl>0?'+':'')+v.pnl:'·'}</div>
-      </div>`;
-    }).join('')}
-  </div>`;
-
-  // Table
-  document.getElementById('sessionTableBody').innerHTML = sorted.map(([s,v])=>{
-    const wr=(v.wins/v.trades.length*100).toFixed(0);
-    const avgRR=(v.rr/v.trades.length).toFixed(2);
-    const avgPnl=(v.pnl/v.trades.length).toFixed(2);
-    const mk=v.trades.filter(t=>t.mistake).length;
-    return `<tr>
-      <td style="font-weight:600;color:${sessionColors[s]||'var(--muted)'}">${s}</td>
-      <td class="mono">${v.trades.length}</td>
-      <td class="mono">${v.wins} / ${v.trades.length-v.wins}</td>
-      <td><span style="background:${parseFloat(wr)>=60?'rgba(74,222,128,.12)':parseFloat(wr)>=50?'rgba(251,191,36,.12)':'rgba(248,113,113,.12)'};color:${parseFloat(wr)>=60?'var(--accent)':parseFloat(wr)>=50?'var(--yellow)':'var(--red)'};padding:2px 8px;border-radius:4px;font-family:var(--mono);font-size:12px">${wr}%</span></td>
-      <td class="${v.pnl>=0?'pnl-pos':'pnl-neg'} mono">${v.pnl>=0?'+':''}$${v.pnl}</td>
-      <td class="mono" style="color:var(--muted)">${parseFloat(avgPnl)>=0?'+':''}$${avgPnl}</td>
-      <td class="mono">${avgRR}</td>
-      <td class="mono" style="color:${mk>0?'var(--orange)':'var(--accent)'}">${mk}</td>
-    </tr>`;
-  }).join('');
 }
 
 // ============================================================
